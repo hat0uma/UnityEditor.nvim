@@ -4,18 +4,6 @@ local ipc = require("unity-editor.ipc")
 local is_windows = vim.loop.os_uname().sysname:match("Windows")
 
 local PIPENAME_BASE = is_windows and "\\\\.\\pipe\\UnityEditorIPC" or "/tmp/UnityEditorIPC"
-local function set_interval(interval, callback)
-  local timer = vim.loop.new_timer()
-  timer:start(interval, interval, function()
-    callback()
-  end)
-  return timer
-end
-
-local function clear_interval(timer)
-  timer:stop()
-  timer:close()
-end
 
 --- load Unity EditorInstance.json
 ---@param project_dir string Unity project directory path
@@ -56,8 +44,6 @@ end
 --- @class UnityEditorClient
 --- @field client IPC.Client
 --- @field project_dir string
---- @field check_timer uv_timer_t?
---- @field retry_count number
 --- @field handlers table<string,fun(data:any)>
 local Editor = {}
 
@@ -69,9 +55,6 @@ function Editor:new(project_dir)
   obj.client = ipc.Client:new()
   obj.handlers = {}
   obj.project_dir = project_dir
-  --- @type uv_timer_t?
-  obj.check_timer = nil
-  obj.retry_count = 0
 
   setmetatable(obj, self)
   self.__index = self
@@ -79,14 +62,17 @@ function Editor:new(project_dir)
 end
 
 --- connect to running Unity Editor
-function Editor:connect()
-  self:close()
+---@param on_connect fun()
+function Editor:connect(on_connect)
+  if self:is_connected() then
+    return
+  end
 
   -- load EditorInstance.json
   local ok, data = pcall(load_editor_instance_json, self.project_dir)
   if not ok then
     vim.notify(
-      string.format("Failed to load EditorInstance.json. Please make sure Unity is running.\n%s", data),
+      string.format("Failed to load Library/EditorInstance.json. Please make sure Unity is running.\n%s", data),
       vim.log.levels.ERROR
     )
     return
@@ -95,55 +81,25 @@ function Editor:connect()
   -- connect to Unity Editor
   local pipename = string.format("%s-%d", PIPENAME_BASE, data.process_id)
   vim.print("connecting to Unity Editor: " .. pipename)
-  self:_ensure_connection(pipename)
-end
+  self.client:connect(pipename, function(err)
+    if err then
+      vim.notify(string.format("Connection failed. Please make sure Unity is running.: %s", err), vim.log.levels.ERROR)
+      return
+    end
 
---- ensure connection to Unity Editor
---- @param pipename string
-function Editor:_ensure_connection(pipename)
-  -- clear previous timer
-  if self.check_timer then
-    clear_interval(self.check_timer)
-    self.check_timer = nil
-  end
-
-  self.check_timer = set_interval(
-    1000,
-    vim.schedule_wrap(function()
-      -- check if connected
-      if self.client:is_connected() then
-        return
-      end
-
-      -- reconnect
-      self.client:connect(pipename, function(err)
-        if err then
-          self.retry_count = self.retry_count + 1
-          if self.retry_count > 20 then
-            vim.notify(
-              string.format("Connection failed. Please make sure Unity is running.: %s", err),
-              vim.log.levels.ERROR
-            )
-            self:close()
-          end
-          return
-        end
-
-        print("connected")
-        self.client:read_start(self._handle_message)
-      end)
+    -- start reading from Unity Editor
+    self.client:read_start(function(data)
+      self:_handle_message(data)
     end)
-  )
+
+    print("Unity connected.")
+    on_connect()
+  end)
 end
 
 --- close Unity Editor connection
 function Editor:close()
-  if self.check_timer then
-    clear_interval(self.check_timer)
-    self.check_timer = nil
-  end
   pcall(self.client.close, self.client)
-  self.retry_count = 0
 end
 
 --- register event callback
@@ -151,7 +107,8 @@ end
 ---@param callback fun(data:any)
 function Editor:on(event, callback)
   -- register event callback
-  self.handlers[event] = callback
+  -- TODO: implement event handling
+  error("not implemented")
 end
 
 --- check if connected to Unity Editor
@@ -165,7 +122,16 @@ end
 ---@param method string method name
 ---@param arguments string[] method arguments
 function Editor:execute_method(type, method, arguments)
-  self:_send("executeMethod", { type, method, unpack(arguments) })
+  local run = function()
+    self:_send("executeMethod", { type, method, unpack(arguments) })
+  end
+
+  -- if not connected, run after connecting
+  if not self:is_connected() then
+    self:connect(run)
+  else
+    run()
+  end
 end
 
 --- send json data to Unity Editor
@@ -179,28 +145,8 @@ end
 --- handle message from Unity Editor
 ---@param data string
 function Editor:_handle_message(data)
+  -- TODO: handle message from Unity Editor
   print(data)
-  if true then
-    return
-  end
-
-  -- decode data as json
-  local decoded = vim.json.decode(data)
-  if type(decoded) ~= "table" then
-    error("decode failed")
-  end
-  -- payload must have `event` and `data`
-  if type(decoded.event) ~= "string" then
-    error("event is not string")
-  end
-  if not decoded.data then
-    error("data is nil")
-  end
-
-  -- call event handlers
-  if self.handlers[decoded.event] then
-    self.handlers[decoded.event](decoded.data)
-  end
 end
 
 M.Editor = Editor
