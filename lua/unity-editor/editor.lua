@@ -118,6 +118,7 @@ function Editor:is_connected()
 end
 
 --- execute static method in Unity Editor
+--- The methods that can be executed are restricted by the whitelist on the server side. For details, see NeovimMessageDispatcher.cs.
 ---@param type string Unity object type(needs full qualified name)
 ---@param method string method name
 ---@param arguments string[] method arguments
