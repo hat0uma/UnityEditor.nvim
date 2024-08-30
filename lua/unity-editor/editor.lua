@@ -1,7 +1,7 @@
 local M = {}
 
 local ipc = require("unity-editor.ipc")
-local is_windows = vim.loop.os_uname().sysname:match("Windows")
+local is_windows = vim.uv.os_uname().sysname:match("Windows")
 
 local PIPENAME_BASE = is_windows and "\\\\.\\pipe\\UnityEditorIPC" or "/tmp/UnityEditorIPC"
 
@@ -10,17 +10,17 @@ local PIPENAME_BASE = is_windows and "\\\\.\\pipe\\UnityEditorIPC" or "/tmp/Unit
 ---@return {process_id:number,version:string,app_path:string,app_contents_path:string}
 local function load_editor_instance_json(project_dir)
   local json_path = vim.fs.joinpath(project_dir, "Library/EditorInstance.json")
-  local f = vim.loop.fs_open(json_path, "r", 438)
+  local f = vim.uv.fs_open(json_path, "r", 438)
   if not f then
     error(string.format("%s open failed.", json_path))
   end
 
-  local stat = vim.loop.fs_fstat(f)
+  local stat = vim.uv.fs_fstat(f)
   if not stat then
     error(string.format("%s stat failed.", json_path))
   end
 
-  local data = vim.loop.fs_read(f, stat.size, 0)
+  local data = vim.uv.fs_read(f, stat.size, 0)
   if type(data) ~= "string" then
     error(string.format("%s read failed.", json_path))
   end
@@ -117,14 +117,13 @@ function Editor:is_connected()
   return self.client:is_connected()
 end
 
---- execute static method in Unity Editor
---- The methods that can be executed are restricted by the whitelist on the server side. For details, see NeovimMessageDispatcher.cs.
----@param type string Unity object type(needs full qualified name)
----@param method string method name
----@param arguments string[] method arguments
-function Editor:execute_method(type, method, arguments)
-  local run = function()
-    self:_send("executeMethod", { type, method, unpack(arguments) })
+--- send json message to Unity Editor
+---@param type string
+---@param arguments string[]
+function Editor:send(type, arguments)
+  local function run()
+    local payload = vim.json.encode({ type = type, arguments = arguments })
+    self.client:send(payload .. "\n")
   end
 
   -- if not connected, run after connecting
@@ -133,14 +132,6 @@ function Editor:execute_method(type, method, arguments)
   else
     run()
   end
-end
-
---- send json data to Unity Editor
----@param type string
----@param arguments string[]
-function Editor:_send(type, arguments)
-  local payload = vim.json.encode({ type = type, arguments = arguments })
-  self.client:send(payload .. "\n")
 end
 
 --- handle message from Unity Editor

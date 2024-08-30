@@ -6,17 +6,10 @@ using UnityEngine;
 
 namespace NeovimEditor
 {
-    [InitializeOnLoad]
-    public static class NeovimMessageDispatcher
+    public class NeovimMessageDispatcher
     {
-        static NeovimMessageDispatcher()
-        {
-            // Register update callback
-            EditorApplication.update += Update;
-        }
-
         // Whitelist of commands that can be executed from Neovim.
-        private static readonly (string type, string method)[] _commandWhiteList = new (string type, string method)[]
+        private static readonly (string type, string method)[] commandWhiteList = new (string type, string method)[]
         {
         ( "UnityEditor.AssetDatabase", "Refresh" ),
         ( "UnityEditor.EditorApplication", "EnterPlaymode" ),
@@ -24,37 +17,31 @@ namespace NeovimEditor
         ( "UnityEditor.SyncVS", "SyncSolution" ),
         };
 
-        public static void Update()
-        {
-            // Process message queue
-            IPCMessage message;
-            if (IPCServerInstance.MessageQueue.TryDequeue(out message))
-            {
-                Debug.Log($"Dispatch message: {message.type}");
-                HandleIPCMessage(message);
-            }
-        }
-
         /// <summary>
-        /// Handle IPC message
+        /// Dispatch IPC message
         /// </summary>
         /// <param name="message">Received message</param>
         /// <returns></returns>
-        public static void HandleIPCMessage(IPCMessage message)
+        public static void Dispatch(IPCMessage message)
         {
             switch (message.type)
             {
-                case "executeMethod":
-                    if (message.arguments.Length < 2)
-                    {
-                        Debug.LogWarning("Invalid arguments length");
-                        return;
-                    }
-                    var typeName = message.arguments[0];
-                    var methodName = message.arguments[1];
-                    var args = message.arguments.Skip(2).ToArray();
-                    ExecuteMethod(typeName, methodName, args);
+                case "refrsh":
+                    Refresh();
                     break;
+
+                case "enter_playmode":
+                    EnterPlaymode();
+                    break;
+
+                case "exit_playmode":
+                    ExitPlaymode();
+                    break;
+
+                case "generate_sln":
+                    GenerateSolution();
+                    break;
+
                 default:
                     Debug.LogWarning($"Unknown message type: {message.type}");
                     break;
@@ -71,7 +58,7 @@ namespace NeovimEditor
         private static void ExecuteMethod(string typeName, string methodName, string[] args)
         {
             // Check if command is allowed
-            if (!_commandWhiteList.Contains((typeName, methodName)))
+            if (!commandWhiteList.Contains((typeName, methodName)))
             {
                 Debug.LogWarning($"Command not allowed: {typeName}.{methodName}");
                 return;
@@ -101,6 +88,43 @@ namespace NeovimEditor
             Debug.Log($"Executing {typeName}.{methodName} in {assembly.FullName}");
             _ = method.Invoke(null, args);
         }
+
+        private static void Refresh()
+        {
+            AssetDatabase.Refresh();
+        }
+
+        private static void EnterPlaymode()
+        {
+            EditorApplication.EnterPlaymode();
+        }
+
+        private static void ExitPlaymode()
+        {
+            EditorApplication.ExitPlaymode();
+        }
+
+        private static void GenerateSolution()
+        {
+            // UnityEditor.SyncVS.SyncSolution() is internal, so use reflection to call it.
+            var assembly = typeof(UnityEditor.Editor).Assembly;
+            var SyncVS = assembly.GetType("UnityEditor.SyncVS");
+            if (SyncVS == null)
+            {
+                Debug.LogWarning("Type not found: UnityEditor.SyncVS");
+                return;
+            }
+
+            var method = SyncVS.GetMethod("SyncSolution", BindingFlags.Public | BindingFlags.Static);
+            if (method == null)
+            {
+                Debug.LogWarning("Method not found: UnityEditor.SyncVS.SyncSolution");
+                return;
+            }
+
+            method.Invoke(null, null);
+        }
+
     }
 
 }
