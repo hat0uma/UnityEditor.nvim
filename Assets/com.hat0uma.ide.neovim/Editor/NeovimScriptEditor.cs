@@ -79,6 +79,14 @@ namespace NeovimEditor
         /// </summary>
         public void OnGUI()
         {
+            // Terminal for new Neovim instance
+            var prevTerminal = NeovimScriptEditorPrefs.Terminal;
+            var terminal = EditorGUILayout.TextField(new GUIContent("Terminal command"), prevTerminal);
+            if (terminal != prevTerminal)
+            {
+                NeovimScriptEditorPrefs.Terminal = terminal;
+            }
+
             // Neovim integration feature toggle
             var prevIntegrationEnabled = NeovimScriptEditorPrefs.IntegrationEnabled;
             var integrationEnabled = EditorGUILayout.Toggle(new GUIContent("Neovim Integration"), prevIntegrationEnabled);
@@ -87,18 +95,7 @@ namespace NeovimEditor
                 NeovimScriptEditorPrefs.IntegrationEnabled = integrationEnabled;
             }
 
-            // Integration settings
-            using (new EditorGUI.DisabledScope(!integrationEnabled))
-            {
-                // Terminal for new Neovim instance
-                var prevTerminal = NeovimScriptEditorPrefs.Terminal;
-                var terminal = EditorGUILayout.TextField(new GUIContent("Terminal command"), prevTerminal);
-                if (terminal != prevTerminal)
-                {
-                    NeovimScriptEditorPrefs.Terminal = terminal;
-                }
-            }
-
+            // Solution generation settings
             EditorGUILayout.LabelField("Generate .csproj files for:");
             EditorGUI.indentLevel++;
             SettingsButton(ProjectGenerationFlag.Embedded, "Embedded packages", "");
