@@ -2,7 +2,7 @@
 
 WIP
 
-## Features
+## Progress
 
 - [ ] Add documentation and configuration options.
 - [x] Automatically compile scripts when saving.
