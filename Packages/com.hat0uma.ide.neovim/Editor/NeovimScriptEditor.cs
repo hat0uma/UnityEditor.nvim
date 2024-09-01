@@ -1,8 +1,5 @@
 using System.IO;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
-using System.Runtime.InteropServices;
 using Unity.CodeEditor;
 using UnityEditor;
 using UnityEngine;
@@ -138,7 +135,7 @@ namespace NeovimEditor
         /// </summary>
         public bool OpenProject(string filePath, int line, int column)
         {
-            Debug.Log($"OpenProject: {filePath}");
+            // Debug.Log($"OpenProject: {filePath}");
             if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
             {
                 return false;

@@ -1,7 +1,6 @@
 ﻿using System.IO.Pipes;
 using UnityEngine;
 using System;
-using UnityEditor;
 using System.Threading;
 using System.IO;
 using System.Threading.Tasks;
@@ -66,14 +65,14 @@ namespace NeovimEditor
                 {
                     // Create server
                     using (var server = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous))
-                    using (var register = token.Register(() => server.Close()))
+                    using (var reader = new StreamReader(server))
                     {
                         // Wait for ipc client connection
-                        Debug.Log("Waiting for connection...");
+                        // Debug.Log("Waiting for connection...");
                         await server.WaitForConnectionAsync(token);
 
-                        Debug.Log("Connected");
-                        await HandleConnection(server, token);
+                        // Debug.Log("Connected");
+                        await HandleConnection(server, reader, token);
                     }
                 }
             }
@@ -87,25 +86,24 @@ namespace NeovimEditor
             }
         }
 
-
-        private async Task HandleConnection(NamedPipeServerStream server, CancellationToken token)
+        private async Task HandleConnection(NamedPipeServerStream server, StreamReader reader, CancellationToken token)
         {
-            var reader = new StreamReader(server);
             while (!token.IsCancellationRequested && server.IsConnected)
             {
                 // Read message from client.
-                Debug.Log("Reading message...");
+                // Debug.Log("Reading message...");
                 string message = await PipeReadLine(server, token);
 
                 // Check if client disconnected.
                 if (message == null)
                 {
-                    Debug.Log("Disconnected");
+                    // Debug.Log("Disconnected");
                     break;
+
                 }
 
                 // Enqueue message to queue for main thread.
-                Debug.Log($"Received message: {message}");
+                // Debug.Log($"Received message: {message}");
                 try
                 {
                     var ipcMessage = JsonUtility.FromJson<IPCMessage>(message);

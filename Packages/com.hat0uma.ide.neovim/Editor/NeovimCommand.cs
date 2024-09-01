@@ -5,7 +5,9 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using Unity.CodeEditor;
-using UnityEngine;
+using Process = System.Diagnostics.Process;
+using ProcessWindowStyle = System.Diagnostics.ProcessWindowStyle;
+using ProcessStartInfo = System.Diagnostics.ProcessStartInfo;
 
 namespace NeovimEditor
 {
@@ -35,16 +37,16 @@ namespace NeovimEditor
         /// <summary>
         /// Open the file in the existing Neovim.
         /// </summary>
-        public static System.Diagnostics.Process OpenInExistInstance(string filePath, int line, int column, string serverPath)
+        public static Process OpenInExistInstance(string filePath, int line, int column, string serverPath)
         {
-            var process = new System.Diagnostics.Process
+            var process = new Process
             {
-                StartInfo = new System.Diagnostics.ProcessStartInfo
+                StartInfo = new ProcessStartInfo
                 {
                     FileName = CodeEditor.CurrentEditorInstallation,
                     UseShellExecute = true,
                     CreateNoWindow = true,
-                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
+                    WindowStyle = ProcessWindowStyle.Hidden,
                     Arguments = ShellJoin(new string[]{
                         "-u",
                         "NONE",
@@ -63,7 +65,7 @@ namespace NeovimEditor
         /// <summary>
         /// Open the file in the new Neovim window.
         /// </summary>
-        public static System.Diagnostics.Process OpenNewInstance(string filePath, int line, int column)
+        public static Process OpenNewInstance(string filePath, int line, int column)
         {
             // construct arguments for new neovim window.
             var terminalSpecified = !string.IsNullOrEmpty(NeovimScriptEditorPrefs.Terminal);
@@ -78,7 +80,7 @@ namespace NeovimEditor
             command.Add("-c");
             command.Add($"call cursor({line},{column})");
 
-            var startInfo = new System.Diagnostics.ProcessStartInfo();
+            var startInfo = new ProcessStartInfo();
             startInfo.FileName = command[0];
             startInfo.UseShellExecute = true;
             startInfo.Arguments = ShellJoin(command.Skip(1));
@@ -86,15 +88,15 @@ namespace NeovimEditor
             {
                 // When the terminal is specified, both the command window and the terminal window are displayed, so hide the command window.
                 startInfo.CreateNoWindow = true;
-                startInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
+                startInfo.WindowStyle = ProcessWindowStyle.Hidden;
             }
             else
             {
                 startInfo.CreateNoWindow = false;
-                startInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Normal;
+                startInfo.WindowStyle = ProcessWindowStyle.Normal;
             }
 
-            var process = new System.Diagnostics.Process { StartInfo = startInfo };
+            var process = new Process { StartInfo = startInfo };
             process.Start();
             return process;
         }
