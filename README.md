@@ -37,7 +37,7 @@ lazy.nvim
   'hat0uma/UnityEditor.nvim',
   config = function()
     require('unity-editor').setup()
-  end
+  end,
   ft = {'cs'}
 }
 ```
