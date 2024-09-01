@@ -1,7 +1,7 @@
 This package contains third-party software components governed by the license(s) indicated below:
 ---------
 
-Component Name: ProjectGeneration from `com.unity.ide.vscode`
+Component Name: ProjectGeneration from [Code Editor Package for Visual Studio Code](https://docs.unity3d.com/Packages/com.unity.ide.vscode@1.2/manual/index.html)
 
 License Type: MIT License
 
