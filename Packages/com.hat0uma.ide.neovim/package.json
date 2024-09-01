@@ -1,8 +1,8 @@
 {
   "name": "com.hat0uma.ide.neovim",
-  "version": "0.0.1",
-  "description": "Unofficial Neovim Integration for Unity",
   "displayName": "Neovim Editor",
+  "description": "Unofficial Neovim Integration for Unity",
+  "version": "0.0.1",
   "unity": "2022.3",
   "license": "MIT",
   "keywords": [
