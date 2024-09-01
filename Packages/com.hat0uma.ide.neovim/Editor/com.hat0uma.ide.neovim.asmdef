@@ -1,5 +1,5 @@
 {
-    "name": "com.hat0uma.iede.neovim",
+    "name": "com.hat0uma.ide.neovim",
     "rootNamespace": "",
     "references": [],
     "includePlatforms": [
@@ -9,7 +9,7 @@
     "allowUnsafeCode": false,
     "overrideReferences": false,
     "precompiledReferences": [],
-    "autoReferenced": true,
+    "autoReferenced": false,
     "defineConstraints": [],
     "versionDefines": [],
     "noEngineReferences": false
