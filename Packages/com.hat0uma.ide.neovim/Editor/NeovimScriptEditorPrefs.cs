@@ -17,7 +17,7 @@ namespace NeovimEditor
         /// </summary>
         public static bool IntegrationEnabled
         {
-            get => EditorPrefs.GetBool(Key.IntegrationEnabled, false);
+            get => EditorPrefs.GetBool(Key.IntegrationEnabled, true);
             set => EditorPrefs.SetBool(Key.IntegrationEnabled, value);
         }
 
