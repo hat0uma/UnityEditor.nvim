@@ -5,6 +5,9 @@ WIP
 ## Progress
 
 - [ ] Add documentation and configuration options.
+- [ ] Open script in Neovim
+  - Windows: Only works with default Neovim server settings. ([see](https://github.com/hat0uma/UnityEditor.nvim/blob/main/Packages/com.hat0uma.ide.neovim/Editor/NeovimCommand.cs#L19))
+  - linux, macOS: Not implemented yet.
 - [x] Compile scripts from Neovim.
 - [x] Enter/Exit Play Mode from Neovim.
 - [x] Generate .sln and .csproj files from Neovim.
