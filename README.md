@@ -1,6 +1,8 @@
 # UnityEditor.nvim
 
-WIP
+<details>
+
+<summary>WIP</summary>
 
 ## Progress
 
@@ -41,3 +43,5 @@ lazy.nvim
   ft = {'cs'}
 }
 ```
+
+</details>
