@@ -2,12 +2,12 @@ vim.api.nvim_create_user_command("UnityRefresh", function()
   require("unity-editor.api").refresh()
 end, {})
 
-vim.api.nvim_create_user_command("UnityGamePlay", function()
-  require("unity-editor.api").game_play()
+vim.api.nvim_create_user_command("UnityPlaymodeEnter", function()
+  require("unity-editor.api").playmode_enter()
 end, {})
 
-vim.api.nvim_create_user_command("UnityGameStop", function()
-  require("unity-editor.api").game_stop()
+vim.api.nvim_create_user_command("UnityPlaymodeExit", function()
+  require("unity-editor.api").playmode_exit()
 end, {})
 
 vim.api.nvim_create_user_command("UnityGenerateSln", function()

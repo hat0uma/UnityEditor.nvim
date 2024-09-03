@@ -19,11 +19,11 @@ namespace NeovimEditor
                     Refresh();
                     break;
 
-                case "enter_playmode":
+                case "playmode_enter":
                     EnterPlaymode();
                     break;
 
-                case "exit_playmode":
+                case "playmode_exit":
                     ExitPlaymode();
                     break;
 

@@ -25,7 +25,7 @@ local function unity_message_sender(type, arguments)
   ---@param project_dir? string
   return function(project_dir)
     if not project_dir then
-      project_dir = vim.fn.getcwd()
+      project_dir = assert(vim.uv.cwd())
     end
 
     -- execute unity-side method.
@@ -40,10 +40,10 @@ end
 M.refresh = unity_message_sender("refresh", {})
 
 --- request Unity Editor to play game
-M.game_play = unity_message_sender("enter_playmode", {})
+M.playmode_enter = unity_message_sender("playmode_enter", {})
 
 --- request Unity Editor to stop game
-M.game_stop = unity_message_sender("exit_playmode", {})
+M.playmode_exit = unity_message_sender("playmode_exit", {})
 
 --- generate Visual Studio solution file
 M.generate_sln = unity_message_sender("generate_sln", {})
