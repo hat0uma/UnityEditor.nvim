@@ -10,6 +10,10 @@ vim.api.nvim_create_user_command("UnityPlaymodeExit", function()
   require("unity-editor.api").playmode_exit()
 end, {})
 
+vim.api.nvim_create_user_command("UnityPlaymodeToggle", function()
+  require("unity-editor.api").playmode_toggle()
+end, {})
+
 vim.api.nvim_create_user_command("UnityGenerateSln", function()
   require("unity-editor.api").generate_sln()
 end, {})

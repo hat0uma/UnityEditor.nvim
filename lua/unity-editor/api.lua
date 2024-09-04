@@ -45,6 +45,9 @@ M.playmode_enter = unity_message_sender("playmode_enter", {})
 --- request Unity Editor to stop game
 M.playmode_exit = unity_message_sender("playmode_exit", {})
 
+--- request Unity Editor to toggle play game
+M.playmode_toggle = unity_message_sender("playmode_toggle", {})
+
 --- generate Visual Studio solution file
 M.generate_sln = unity_message_sender("generate_sln", {})
 

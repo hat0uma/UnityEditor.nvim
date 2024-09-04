@@ -1,17 +1,18 @@
 using System.Reflection;
+using Unity.CodeEditor;
 using UnityEditor;
 using UnityEngine;
 
 namespace NeovimEditor
 {
-    public class NeovimMessageDispatcher
+    public class NeovimMessageHandler
     {
         /// <summary>
-        /// Dispatch IPC message
+        /// Handle IPC message
         /// </summary>
         /// <param name="message">Received message</param>
         /// <returns></returns>
-        public static void Dispatch(IPCMessage message)
+        public void Handle(IPCMessage message)
         {
             switch (message.type)
             {
@@ -27,6 +28,10 @@ namespace NeovimEditor
                     ExitPlaymode();
                     break;
 
+                case "playmode_toggle":
+                    TogglePlaymode();
+                    break;
+
                 case "generate_sln":
                     GenerateSolution();
                     break;
@@ -37,40 +42,37 @@ namespace NeovimEditor
             }
         }
 
-        private static void Refresh()
+        private void Refresh()
         {
             AssetDatabase.Refresh();
         }
 
-        private static void EnterPlaymode()
+        private void EnterPlaymode()
         {
             EditorApplication.EnterPlaymode();
         }
 
-        private static void ExitPlaymode()
+        private void ExitPlaymode()
         {
             EditorApplication.ExitPlaymode();
         }
 
-        private static void GenerateSolution()
+        private void TogglePlaymode()
         {
-            // UnityEditor.SyncVS.SyncSolution() is internal, so use reflection to call it.
-            var assembly = typeof(UnityEditor.Editor).Assembly;
-            var SyncVS = assembly.GetType("UnityEditor.SyncVS");
-            if (SyncVS == null)
+            if (EditorApplication.isPlaying)
             {
-                Debug.LogWarning("Type not found: UnityEditor.SyncVS");
-                return;
+                EditorApplication.ExitPlaymode();
             }
-
-            var method = SyncVS.GetMethod("SyncSolution", BindingFlags.Public | BindingFlags.Static);
-            if (method == null)
+            else
             {
-                Debug.LogWarning("Method not found: UnityEditor.SyncVS.SyncSolution");
-                return;
+                EditorApplication.EnterPlaymode();
             }
+        }
 
-            method.Invoke(null, null);
+        private void GenerateSolution()
+        {
+            AssetDatabase.Refresh();
+            CodeEditor.Editor.CurrentCodeEditor.SyncAll();
         }
 
     }

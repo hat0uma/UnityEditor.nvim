@@ -54,6 +54,11 @@ namespace NeovimEditor
         private IExternalCodeEditor prevCodeEditor;
 
         /// <summary>
+        /// Neovim message handler.
+        /// </summary>
+        private NeovimMessageHandler messageHandler = new NeovimMessageHandler();
+
+        /// <summary>
         /// Update for Editor.
         /// </summary>
         public void Update()
@@ -113,7 +118,7 @@ namespace NeovimEditor
             // Process message queue
             if (server.MessageQueue.TryDequeue(out var message))
             {
-                NeovimMessageDispatcher.Dispatch(message);
+                messageHandler.Handle(message);
             }
         }
 
