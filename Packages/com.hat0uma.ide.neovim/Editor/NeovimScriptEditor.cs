@@ -129,6 +129,19 @@ namespace NeovimEditor
             }
         }
 
+        /// <summary>
+        /// Get the supported extensions for Neovim.
+        /// </summary>
+        public string[] SupportedExtensions
+        {
+            get
+            {
+                var builtin = EditorSettings.projectGenerationBuiltinExtensions;
+                var user = EditorSettings.projectGenerationUserExtensions;
+                var additional = new[] { "json", "toml", "yaml", "yml" };
+                return builtin.Concat(user).Concat(additional).Distinct().Select(e => e.TrimStart('.')).ToArray();
+            }
+        }
 
         /// <summary>
         /// Open the project at the given file path.
@@ -137,6 +150,13 @@ namespace NeovimEditor
         {
             // Debug.Log($"OpenProject: {filePath}");
             if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            {
+                return false;
+            }
+
+            // Check if the file extension is supported.
+            var extension = Path.GetExtension(filePath).TrimStart('.');
+            if (!SupportedExtensions.Contains(extension))
             {
                 return false;
             }
