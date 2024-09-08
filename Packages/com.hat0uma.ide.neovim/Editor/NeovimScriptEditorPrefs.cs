@@ -8,17 +8,7 @@ namespace NeovimEditor
         private class Key
         {
             private const string Format = "com.hat0uma.ide.neovim.{0}";
-            public static string IntegrationEnabled = string.Format(Format, "IntegrationEnabled");
             public static string Terminal = string.Format(Format, "Terminal");
-        }
-
-        /// <summary>
-        /// Neovim integration enabled.
-        /// </summary>
-        public static bool IntegrationEnabled
-        {
-            get => EditorPrefs.GetBool(Key.IntegrationEnabled, true);
-            set => EditorPrefs.SetBool(Key.IntegrationEnabled, value);
         }
 
         /// <summary>

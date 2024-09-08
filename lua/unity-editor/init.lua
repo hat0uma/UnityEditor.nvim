@@ -1,16 +1,38 @@
+--- @class UnityEditor.api
 local M = {}
 
-local api = require("unity-editor.api")
+local function register_compile_on_save()
+  vim.api.nvim_create_autocmd("BufWritePost", {
+    callback = function()
+      local bufnr = vim.api.nvim_get_current_buf()
+      local path = vim.api.nvim_buf_get_name(bufnr)
+      if not path:match("%.cs$") then
+        return
+      end
 
-function M.setup()
-  -- vim.api.nvim_create_autocmd("BufWritePost", {
-  --   callback = function()
-  --     if vim.fn.expand("%:e") == "cs" then
-  --       api.refresh()
-  --     end
-  --   end,
-  --   group = vim.api.nvim_create_augroup("unity", {}),
-  -- })
+      local api = require("unity-editor.api")
+      local project_root = api.find_unity_project_root(bufnr)
+      if project_root then
+        api.refresh(project_root)
+      end
+    end,
+    group = vim.api.nvim_create_augroup("unity-editor-compile", {}),
+  })
 end
 
-return M
+---Setup
+---@param opts? UnityEditor.Config
+function M.setup(opts)
+  local config = require("unity-editor.config")
+  opts = config.setup(opts)
+
+  if opts.compile_on_save then
+    register_compile_on_save()
+  end
+end
+
+return setmetatable(M, {
+  __index = function(_, k)
+    return require("unity-editor.api")[k]
+  end,
+})

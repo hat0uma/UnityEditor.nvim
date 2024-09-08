@@ -44,11 +44,6 @@ namespace NeovimEditor
         private CancellationTokenSource cts;
 
         /// <summary>
-        /// Previous state of Neovim IPC integration.
-        /// </summary>
-        private bool prevEnabled = false;
-
-        /// <summary>
         /// Previous code editor.
         /// </summary>
         private IExternalCodeEditor prevCodeEditor;
@@ -63,40 +58,32 @@ namespace NeovimEditor
         /// </summary>
         public void Update()
         {
+            // Check if code editor has changed
+            if (prevCodeEditor != CodeEditor.CurrentEditor)
+            {
+                OnCodeEditorChanged(CodeEditor.CurrentEditor, prevCodeEditor);
+            }
+
+            // Process incoming message if current editor is NeovimScriptEditor
             if (CodeEditor.CurrentEditor is NeovimScriptEditor)
             {
-                // Start or stop server based on the enabled state.
-                var codeEditorChanged = prevCodeEditor != CodeEditor.CurrentEditor;
-                var integrationStateChanged = prevEnabled != NeovimScriptEditorPrefs.IntegrationEnabled;
-                if (codeEditorChanged || integrationStateChanged)
-                {
-                    if (NeovimScriptEditorPrefs.IntegrationEnabled)
-                    {
-                        StartServer();
-                    }
-                    else
-                    {
-                        DisposeServer();
-                    }
-                }
-
-                // Process incoming messages
-                if (NeovimScriptEditorPrefs.IntegrationEnabled)
-                {
-                    ProcessIncomingMessage();
-                }
-            }
-            // Skip if current editor is not NeovimScriptEditor
-            else
-            {
-                if (prevCodeEditor is NeovimScriptEditor)
-                {
-                    DisposeServer();
-                }
+                ProcessIncomingMessage();
             }
 
-            prevEnabled = NeovimScriptEditorPrefs.IntegrationEnabled;
+            // Update previous code editor
             prevCodeEditor = CodeEditor.CurrentEditor;
+        }
+
+        private void OnCodeEditorChanged(IExternalCodeEditor current, IExternalCodeEditor previous)
+        {
+            if (current is NeovimScriptEditor)
+            {
+                StartServer();
+            }
+            else if (previous is NeovimScriptEditor)
+            {
+                DisposeServer();
+            }
         }
 
         /// <summary>

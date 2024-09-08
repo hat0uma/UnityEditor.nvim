@@ -84,14 +84,6 @@ namespace NeovimEditor
                 NeovimScriptEditorPrefs.Terminal = terminal;
             }
 
-            // Neovim integration feature toggle
-            var prevIntegrationEnabled = NeovimScriptEditorPrefs.IntegrationEnabled;
-            var integrationEnabled = EditorGUILayout.Toggle(new GUIContent("Neovim Integration"), prevIntegrationEnabled);
-            if (integrationEnabled != prevIntegrationEnabled)
-            {
-                NeovimScriptEditorPrefs.IntegrationEnabled = integrationEnabled;
-            }
-
             // Solution generation settings
             EditorGUILayout.LabelField("Generate .csproj files for:");
             EditorGUI.indentLevel++;

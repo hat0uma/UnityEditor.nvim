@@ -14,7 +14,7 @@ namespace NeovimEditor
         /// <returns></returns>
         public void Handle(IPCMessage message)
         {
-            switch (message.type)
+            switch (message.method)
             {
                 case "refresh":
                     Refresh();
@@ -37,7 +37,7 @@ namespace NeovimEditor
                     break;
 
                 default:
-                    Debug.LogWarning($"Unknown message type: {message.type}");
+                    Debug.LogWarning($"Unknown message method: {message.method}");
                     break;
             }
         }

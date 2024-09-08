@@ -16,8 +16,8 @@ namespace NeovimEditor
     [Serializable]
     public class IPCMessage
     {
-        public string type;
-        public string[] arguments;
+        public string method;
+        public string[] parameters;
     }
 
     /// <summary>

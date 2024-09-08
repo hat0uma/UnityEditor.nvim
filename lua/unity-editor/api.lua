@@ -1,27 +1,28 @@
+---@class UnityEditor.api
 local M = {}
 
-local Editor = require("unity-editor.editor").Editor
+local Client = require("unity-editor.client").Client
 
---- @type table<string,UnityEditorClient>
-local editors = {}
+--- @type table<string,UnityEditor.Client>
+local clients = {}
 
 --- get Unity Editor client instance
 ---@param project_dir string Unity project directory path
----@return UnityEditorClient
+---@return UnityEditor.Client
 local function get_project_client(project_dir)
-  local editor = editors[project_dir]
-  if not editor then
-    editor = Editor:new(project_dir)
-    editors[project_dir] = editor
+  local client = clients[project_dir]
+  if not client then
+    client = Client:new(project_dir)
+    clients[project_dir] = client
   end
-  return editor
+  return client
 end
 
 --- execute Unity Editor command
----@param type string
----@param arguments string[]
+---@param method string
+---@param parameters string[]
 ---@return fun(project_dir?: string)
-local function unity_message_sender(type, arguments)
+local function unity_message_sender(method, parameters)
   ---@param project_dir? string
   return function(project_dir)
     if not project_dir then
@@ -29,8 +30,8 @@ local function unity_message_sender(type, arguments)
     end
 
     -- execute unity-side method.
-    local editor = get_project_client(project_dir)
-    editor:send(type, arguments)
+    local client = get_project_client(project_dir)
+    client:send({ method = method, parameters = parameters })
   end
 end
 
@@ -51,38 +52,10 @@ M.playmode_toggle = unity_message_sender("playmode_toggle", {})
 --- generate Visual Studio solution file
 M.generate_sln = unity_message_sender("generate_sln", {})
 
---- load Unity EditorInstance.json
----@param path string path to EditorInstance.json
----@return UnityEditorInstance
-local function load_editor_instance_json(path)
-  local json_path = vim.fs.joinpath(path)
-  local f = assert(vim.uv.fs_open(json_path, "r", 438))
-  local stat = assert(vim.uv.fs_fstat(f))
-  local data = assert(vim.uv.fs_read(f, stat.size, 0))
-  local json = vim.fn.json_decode(data)
-  if type(json) ~= "table" then
-    error(string.format("%s decode failed.", json_path))
-  end
-  --  json must have process_id,version,app_path,app_contents_path
-  vim.validate({
-    process_id = { json.process_id, "number" },
-    version = { json.version, "string" },
-    app_path = { json.app_path, "string" },
-    app_contents_path = { json.app_contents_path, "string" },
-  })
-  return json
-end
-
----@class UnityEditorInstance
----@field process_id number
----@field version string
----@field app_path string
----@field app_contents_path string
-
---- Find Unity Editor Instance
----@param bufnr integer
----@return UnityEditorInstance?
-function M.find_editor_instance(bufnr)
+--- Find Unity project root directory path.
+---@param bufnr integer buffer number
+---@return string|nil project_root Unity project root directory path
+function M.find_unity_project_root(bufnr)
   local buf = vim.api.nvim_buf_get_name(bufnr)
   local found = vim.fs.find("Library/EditorInstance.json", {
     upward = true,
@@ -95,7 +68,8 @@ function M.find_editor_instance(bufnr)
     return nil
   end
 
-  return load_editor_instance_json(found[1])
+  local project_root = vim.fs.dirname(vim.fs.dirname(found[1]))
+  return project_root
 end
 
 return M
