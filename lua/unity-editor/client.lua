@@ -3,8 +3,10 @@ local M = {}
 local is_windows = vim.uv.os_uname().sysname:match("Windows")
 
 local PIPENAME_BASE = is_windows and "\\\\.\\pipe\\UnityEditorIPC" or "/tmp/UnityEditorIPC"
+local PLUGIN_VERSION = "0.1.0"
 
 ---@class UnityEditor.Message
+---@field version string
 ---@field method string
 ---@field parameters string[]
 
@@ -15,9 +17,9 @@ local PIPENAME_BASE = is_windows and "\\\\.\\pipe\\UnityEditorIPC" or "/tmp/Unit
 ---@field app_contents_path string
 
 --- @class UnityEditor.Client
---- @field client uv_pipe_t
---- @field project_dir string
---- @field handlers table<string,fun(data:any)>
+--- @field _pipe uv_pipe_t
+--- @field _project_dir string
+--- @field _handlers table<string,fun(data:any)>
 local Client = {}
 
 --- Create new Unity Editor client
@@ -25,9 +27,9 @@ local Client = {}
 ---@return UnityEditor.Client
 function Client:new(project_dir)
   local obj = {}
-  obj.client = vim.uv.new_pipe(false)
-  obj.handlers = {}
-  obj.project_dir = project_dir
+  obj._pipe = vim.uv.new_pipe(false)
+  obj._handlers = {}
+  obj._project_dir = project_dir
 
   setmetatable(obj, self)
   self.__index = self
@@ -48,29 +50,31 @@ function Client:connect(on_connect)
 
   -- connect to Unity Editor
   vim.print("connecting to Unity Editor: " .. pipename)
-  self.client = vim.uv.new_pipe(false)
-  self.client:connect(pipename, function(err)
+  self._pipe = vim.uv.new_pipe(false)
+  self._pipe:connect(pipename, function(err)
     self:_handle_connection(err, on_connect)
   end)
 end
 
 --- Close connection to Unity Editor
 function Client:close()
-  pcall(self.client.close, self.client)
+  pcall(self._pipe.close, self._pipe)
 end
 
 --- Check if connected to Unity Editor
 ---@return boolean
 function Client:is_connected()
-  return self.client and vim.uv.is_active(self.client) or false
+  return self._pipe and vim.uv.is_active(self._pipe) or false
 end
 
 --- Send message to Unity Editor
----@param message UnityEditor.Message
-function Client:send(message)
+---@param method string
+---@param parameters string[]
+function Client:send(method, parameters)
   local function _send()
+    local message = { version = PLUGIN_VERSION, method = method, parameters = parameters }
     local payload = vim.json.encode(message)
-    self.client:write(payload .. "\n")
+    self._pipe:write(payload .. "\n")
   end
 
   -- if not connected, run after connecting
@@ -85,27 +89,27 @@ end
 --- this will compile scripts and refresh asset database
 --- It works like focus on Unity Editor or press Ctrl+R
 function Client:request_refresh()
-  self:send({ method = "refresh", parameters = {} })
+  self:send("refresh", {})
 end
 
 --- request Unity Editor to play game
 function Client:request_playmode_enter()
-  self:send({ method = "playmode_enter", parameters = {} })
+  self:send("playmode_enter", {})
 end
 
 --- request Unity Editor to stop game
 function Client:request_playmode_exit()
-  self:send({ method = "playmode_exit", parameters = {} })
+  self:send("playmode_exit", {})
 end
 
 --- request Unity Editor to toggle play game
 function Client:request_playmode_toggle()
-  self:send({ method = "playmode_toggle", parameters = {} })
+  self:send("playmode_toggle", {})
 end
 
 --- generate Visual Studio solution file
 function Client:request_generate_sln()
-  self:send({ method = "generate_sln", parameters = {} })
+  self:send("generate_sln", {})
 end
 
 --------------------------------------
@@ -123,7 +127,7 @@ end
 ---@param data string
 function Client:_handle_message(data)
   -- TODO: handle message from Unity Editor
-  print(data)
+  vim.notify(data)
 end
 
 --- handle connection to Unity Editor
@@ -136,14 +140,14 @@ function Client:_handle_connection(err, on_connect)
   end
 
   -- start reading from Unity Editor
-  self.client:read_start(function(err, data)
+  self._pipe:read_start(function(err, data)
     if err then
       vim.notify(string.format("Read failed: %s", err), vim.log.levels.ERROR)
       return
     end
 
     if not data then
-      self.client:close()
+      self._pipe:close()
       return
     end
 
@@ -160,7 +164,7 @@ end
 --- Load EditorInstance.json
 ---@return UnityEditor.EditorInstance
 function Client:_load_editor_instance_json()
-  local json_path = vim.fs.joinpath(self.project_dir, "Library/EditorInstance.json")
+  local json_path = vim.fs.joinpath(self._project_dir, "Library/EditorInstance.json")
 
   -- "Failed to load Library/EditorInstance.json. Please make sure Unity is running.\n%s",
   -- open EditorInstance.json

@@ -14,6 +14,7 @@ namespace NeovimEditor
         /// <returns></returns>
         public void Handle(IPCMessage message)
         {
+            // Debug.Log($"Received message: {message}");
             switch (message.method)
             {
                 case "refresh":

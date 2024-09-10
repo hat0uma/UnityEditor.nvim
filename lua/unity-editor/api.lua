@@ -18,39 +18,62 @@ local function get_project_client(project_dir)
   return client
 end
 
---- execute Unity Editor command
----@param method string
----@param parameters string[]
----@return fun(project_dir?: string)
-local function unity_message_sender(method, parameters)
-  ---@param project_dir? string
-  return function(project_dir)
-    if not project_dir then
-      project_dir = assert(vim.uv.cwd())
-    end
-
-    -- execute unity-side method.
-    local client = get_project_client(project_dir)
-    client:send({ method = method, parameters = parameters })
-  end
-end
-
 --- refresh Unity Editor asset database
 --- this will compile scripts and refresh asset database
 --- It works like focus on Unity Editor or press Ctrl+R
-M.refresh = unity_message_sender("refresh", {})
+--- @param project_dir? string Unity project directory path
+function M.refresh(project_dir)
+  if not project_dir then
+    project_dir = assert(vim.uv.cwd())
+  end
+
+  local client = get_project_client(project_dir)
+  client:request_refresh()
+end
 
 --- request Unity Editor to play game
-M.playmode_enter = unity_message_sender("playmode_enter", {})
+---@param project_dir? string Unity project directory path
+function M.playmode_enter(project_dir)
+  if not project_dir then
+    project_dir = assert(vim.uv.cwd())
+  end
+
+  local client = get_project_client(project_dir)
+  client:request_playmode_enter()
+end
 
 --- request Unity Editor to stop game
-M.playmode_exit = unity_message_sender("playmode_exit", {})
+--- @param project_dir? string Unity project directory path
+function M.playmode_exit(project_dir)
+  if not project_dir then
+    project_dir = assert(vim.uv.cwd())
+  end
+
+  local client = get_project_client(project_dir)
+  client:request_playmode_exit()
+end
 
 --- request Unity Editor to toggle play game
-M.playmode_toggle = unity_message_sender("playmode_toggle", {})
+---@param project_dir? string Unity project directory path
+function M.playmode_toggle(project_dir)
+  if not project_dir then
+    project_dir = assert(vim.uv.cwd())
+  end
 
---- generate Visual Studio solution file
-M.generate_sln = unity_message_sender("generate_sln", {})
+  local client = get_project_client(project_dir)
+  client:request_playmode_toggle()
+end
+
+--- generate Visual Studio solution files
+---@param project_dir? string Unity project directory path
+function M.generate_slm(project_dir)
+  if not project_dir then
+    project_dir = assert(vim.uv.cwd())
+  end
+
+  local client = get_project_client(project_dir)
+  client:request_generate_sln()
+end
 
 --- Find Unity project root directory path.
 ---@param bufnr integer buffer number

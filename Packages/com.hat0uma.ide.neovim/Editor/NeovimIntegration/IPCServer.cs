@@ -16,8 +16,10 @@ namespace NeovimEditor
     [Serializable]
     public class IPCMessage
     {
+        public string version;
         public string method;
         public string[] parameters;
+        public override string ToString() => $"IPCMessage(version={version}, method={method}, parameters=[{string.Join(", ", parameters)}])";
     }
 
     /// <summary>
