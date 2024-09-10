@@ -3,7 +3,7 @@ local M = {}
 
 local function register_compile_on_save()
   vim.api.nvim_create_autocmd("BufWritePost", {
-    callback = function()
+    callback = vim.schedule_wrap(function()
       local bufnr = vim.api.nvim_get_current_buf()
       local path = vim.api.nvim_buf_get_name(bufnr)
       if not path:match("%.cs$") then
@@ -15,7 +15,7 @@ local function register_compile_on_save()
       if project_root then
         api.refresh(project_root)
       end
-    end,
+    end),
     group = vim.api.nvim_create_augroup("unity-editor-compile", {}),
   })
 end

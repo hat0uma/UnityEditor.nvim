@@ -33,10 +33,16 @@ namespace NeovimEditor
         private static readonly string pipeName = $"UnityEditorIPC-{System.Diagnostics.Process.GetCurrentProcess().Id}";
 
         /// <summary>
-        /// Message queue for main thread.
+        /// Message queue for receiving messages from IPC client.
         /// This queue is used to pass messages from worker thread to main thread.
         /// </summary>
-        public ConcurrentQueue<IPCMessage> MessageQueue { get; } = new ConcurrentQueue<IPCMessage>();
+        public ConcurrentQueue<IPCMessage> ReceiveQueue { get; } = new ConcurrentQueue<IPCMessage>();
+
+        /// <summary>
+        /// Message queue for sending messages to IPC client.
+        /// This queue is used to pass messages from main thread to worker thread.
+        /// </summary>
+        public ConcurrentQueue<IPCMessage> SendQueue { get; } = new ConcurrentQueue<IPCMessage>();
 
         /// <summary>
         /// Buffer for reading a line from named pipe server.
@@ -59,20 +65,24 @@ namespace NeovimEditor
         /// </summary>
         private async Task Loop(CancellationToken token)
         {
+            var utf8 = new UTF8Encoding(false);
             try
             {
                 while (!token.IsCancellationRequested)
                 {
                     // Create server
                     using (var server = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous))
-                    using (var reader = new StreamReader(server))
+                    using (var writer = new StreamWriter(server, utf8, 1024, true))
+                    using (var reader = new StreamReader(server, utf8, false, 1024, true))
                     {
                         // Wait for ipc client connection
-                        // Debug.Log("Waiting for connection...");
                         await server.WaitForConnectionAsync(token);
 
-                        // Debug.Log("Connected");
-                        await HandleConnection(server, reader, token);
+                        // Handle send and receive
+                        await Task.WhenAll(
+                            HandleReceive(server, reader, token),
+                            HandleSend(server, writer, token)
+                        );
                     }
                 }
             }
@@ -86,28 +96,37 @@ namespace NeovimEditor
             }
         }
 
-        private async Task HandleConnection(NamedPipeServerStream server, StreamReader reader, CancellationToken token)
+        private async Task HandleSend(NamedPipeServerStream server, StreamWriter writer, CancellationToken token)
+        {
+            while (!token.IsCancellationRequested && server.IsConnected)
+            {
+                if (SendQueue.TryDequeue(out var ipcMessage))
+                {
+                    var message = JsonUtility.ToJson(ipcMessage);
+                    await writer.WriteLineAsync(message.AsMemory(), token);
+                    await writer.FlushAsync();
+                }
+                await Task.Delay(10, token);
+            }
+        }
+
+        private async Task HandleReceive(NamedPipeServerStream server, StreamReader reader, CancellationToken token)
         {
             while (!token.IsCancellationRequested && server.IsConnected)
             {
                 // Read message from client.
-                // Debug.Log("Reading message...");
                 string message = await PipeReadLine(server, token);
-
-                // Check if client disconnected.
                 if (message == null)
                 {
-                    // Debug.Log("Disconnected");
+                    // client disconnected.
                     break;
-
                 }
 
                 // Enqueue message to queue for main thread.
-                // Debug.Log($"Received message: {message}");
                 try
                 {
                     var ipcMessage = JsonUtility.FromJson<IPCMessage>(message);
-                    MessageQueue.Enqueue(ipcMessage);
+                    ReceiveQueue.Enqueue(ipcMessage);
                 }
                 catch (ArgumentException e)
                 {
