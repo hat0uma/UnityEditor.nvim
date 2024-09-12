@@ -2,7 +2,7 @@ local M = {}
 
 ---@class UnityEditor.Config
 local defaults = {
-  compile_on_save = true,
+  autorefresh = true,
 }
 
 ---@type UnityEditor.Config

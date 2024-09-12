@@ -1,22 +1,7 @@
 ---@class UnityEditor.api
 local M = {}
 
-local Client = require("unity-editor.client").Client
-
---- @type table<string,UnityEditor.Client>
-local clients = {}
-
---- get Unity Editor client instance
----@param project_dir string Unity project directory path
----@return UnityEditor.Client
-local function get_project_client(project_dir)
-  local client = clients[project_dir]
-  if not client then
-    client = Client:new(project_dir)
-    clients[project_dir] = client
-  end
-  return client
-end
+local cl = require("unity-editor.client")
 
 --- refresh Unity Editor asset database
 --- this will compile scripts and refresh asset database
@@ -27,7 +12,7 @@ function M.refresh(project_dir)
     project_dir = assert(vim.uv.cwd())
   end
 
-  local client = get_project_client(project_dir)
+  local client = cl.get_project_client(project_dir)
   client:request_refresh()
 end
 
@@ -38,7 +23,7 @@ function M.playmode_enter(project_dir)
     project_dir = assert(vim.uv.cwd())
   end
 
-  local client = get_project_client(project_dir)
+  local client = cl.get_project_client(project_dir)
   client:request_playmode_enter()
 end
 
@@ -49,7 +34,7 @@ function M.playmode_exit(project_dir)
     project_dir = assert(vim.uv.cwd())
   end
 
-  local client = get_project_client(project_dir)
+  local client = cl.get_project_client(project_dir)
   client:request_playmode_exit()
 end
 
@@ -60,18 +45,18 @@ function M.playmode_toggle(project_dir)
     project_dir = assert(vim.uv.cwd())
   end
 
-  local client = get_project_client(project_dir)
+  local client = cl.get_project_client(project_dir)
   client:request_playmode_toggle()
 end
 
 --- generate Visual Studio solution files
 ---@param project_dir? string Unity project directory path
-function M.generate_slm(project_dir)
+function M.generate_sln(project_dir)
   if not project_dir then
     project_dir = assert(vim.uv.cwd())
   end
 
-  local client = get_project_client(project_dir)
+  local client = cl.get_project_client(project_dir)
   client:request_generate_sln()
 end
 
@@ -94,5 +79,7 @@ function M.find_unity_project_root(bufnr)
   local project_root = vim.fs.dirname(vim.fs.dirname(found[1]))
   return project_root
 end
+
+M.autorefresh = require("unity-editor.autorefresh")
 
 return M
