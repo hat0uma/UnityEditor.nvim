@@ -74,17 +74,20 @@ namespace NeovimEditor
                 {
                     // Create server
                     using (var server = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous))
-                    using (var writer = new StreamWriter(server, utf8, 1024, true))
-                    using (var reader = new StreamReader(server, utf8, false, 1024, true))
                     {
                         // Wait for ipc client connection
                         await server.WaitForConnectionAsync(token);
 
                         // Handle send and receive
-                        await Task.WhenAll(
-                            HandleReceive(server, reader, token),
-                            HandleSend(server, writer, token)
-                        );
+                        using (var writer = new StreamWriter(server, utf8, 1024, true))
+                        using (var reader = new StreamReader(server, utf8, false, 1024, true))
+                        {
+                            await Task.WhenAll(
+                                HandleReceive(server, reader, token),
+                                HandleSend(server, writer, token)
+                            );
+                        }
+
                     }
                 }
             }
