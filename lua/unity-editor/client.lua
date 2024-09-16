@@ -3,7 +3,6 @@ local M = {}
 local is_windows = vim.uv.os_uname().sysname:match("Windows")
 
 local PIPENAME_BASE = is_windows and "\\\\.\\pipe\\UnityEditorIPC" or "/tmp/UnityEditorIPC"
-local PLUGIN_VERSION = "0.1.0"
 
 ---@class UnityEditor.Message
 ---@field version string
@@ -72,7 +71,7 @@ end
 ---@param parameters string[]
 function Client:send(method, parameters)
   local function _send()
-    local message = { version = PLUGIN_VERSION, method = method, parameters = parameters }
+    local message = { version = require("unity-editor._VERSION"), method = method, parameters = parameters }
     local payload = vim.json.encode(message)
     self._pipe:write(payload .. "\n")
   end

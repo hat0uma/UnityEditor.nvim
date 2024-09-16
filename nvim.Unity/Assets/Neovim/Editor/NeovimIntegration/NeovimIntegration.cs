@@ -1,9 +1,10 @@
-
 using System;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Unity.CodeEditor;
 using UnityEditor;
+using UnityEngine;
 
 namespace NeovimEditor
 {
@@ -51,7 +52,7 @@ namespace NeovimEditor
         /// <summary>
         /// Neovim message handler.
         /// </summary>
-        private NeovimMessageHandler messageHandler = new NeovimMessageHandler();
+        private NeovimMessageHandler messageHandler = new NeovimMessageHandler(LoadPackageJson());
 
         /// <summary>
         /// Update for Editor.
@@ -129,6 +130,35 @@ namespace NeovimEditor
             cts = null;
             serverTask.Dispose();
             serverTask = null;
+        }
+
+        /// <summary>
+        /// Get the package information from package.json.
+        /// </summary>
+        private static Package LoadPackageJson()
+        {
+            // Get the path of the script file
+            var scriptFilePath = new System.Diagnostics.StackTrace(true).GetFrame(0).GetFileName();
+            if (string.IsNullOrEmpty(scriptFilePath))
+            {
+                Debug.LogError("Failed to get the path of the script file.");
+                return null;
+            }
+
+            string packageRoot = Directory.GetParent(scriptFilePath).Parent.Parent.FullName;
+
+            // Find package.json
+            string packageJsonPath = Path.Combine(packageRoot, "package.json");
+            if (!File.Exists(packageJsonPath))
+            {
+                Debug.LogError("Could not find package.json");
+                return null;
+            }
+
+            // Read package.json
+            string json = File.ReadAllText(packageJsonPath);
+            var packageInfo = JsonUtility.FromJson<Package>(json);
+            return packageInfo;
         }
     }
 }

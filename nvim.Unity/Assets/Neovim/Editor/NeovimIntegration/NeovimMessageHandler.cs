@@ -1,12 +1,31 @@
-using System.Reflection;
 using Unity.CodeEditor;
 using UnityEditor;
 using UnityEngine;
 
 namespace NeovimEditor
 {
+    /// <summary>
+    /// package.json structure
+    /// </summary>
+    public class Package
+    {
+        public string name;
+        public string version;
+        public string displayName;
+        public string description;
+        public string unity;
+        public string author;
+        public string repository;
+        public string license;
+    }
+
     public class NeovimMessageHandler
     {
+        Package package;
+        public NeovimMessageHandler(Package packageJson)
+        {
+            this.package = packageJson;
+        }
 
         /// <summary>
         /// Handle IPC message
@@ -16,9 +35,9 @@ namespace NeovimEditor
         public void Handle(IPCRequestMessage message, IPCServer server)
         {
             // Debug.Log($"Received message: {message}");
-            if (message.version != Version.VERSION)
+            if (message.version != package.version)
             {
-                var result = $"Version mismatch: Expected {Version.VERSION}, but received {message.version}";
+                var result = $"Version mismatch: Expected {package.version}, but received {message.version}";
                 Debug.LogWarning("[Neovim] " + result);
                 server.SendQueue.Enqueue(Response(result, IPCResponseMessage.Status.Error));
                 return;
@@ -62,7 +81,7 @@ namespace NeovimEditor
 
         private IPCResponseMessage Response(string result, IPCResponseMessage.Status status = IPCResponseMessage.Status.OK)
         {
-            return new IPCResponseMessage { version = Version.VERSION, status = (int)status, result = result };
+            return new IPCResponseMessage { version = package.version, status = (int)status, result = result };
         }
 
         private void Refresh()
