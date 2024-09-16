@@ -60,14 +60,24 @@ function M.generate_sln(project_dir)
   client:request_generate_sln()
 end
 
+--- Check if the specified project is open in Unity Editor.
+---@param project_root string Unity project root directory path
+---@return boolean is_unity_editor_running
+function M.is_project_open_in_unity(project_root)
+  local editor_instance = vim.fs.joinpath(project_root, "Library/EditorInstance.json")
+  return vim.uv.fs_access(editor_instance, "R") == true
+end
+
 --- Find Unity project root directory path.
 ---@param bufnr integer buffer number
 ---@return string|nil project_root Unity project root directory path
-function M.find_unity_project_root(bufnr)
+function M.find_project_root(bufnr)
+  -- check `Assets` directory
+  -- see https://docs.unity3d.com/Manual/SpecialFolders.html#Assets
   local buf = vim.api.nvim_buf_get_name(bufnr)
-  local found = vim.fs.find("Library/EditorInstance.json", {
+  local found = vim.fs.find("Assets", {
     upward = true,
-    type = "file",
+    type = "directory",
     stop = vim.uv.os_homedir(),
     path = vim.fs.dirname(buf),
   })
@@ -76,7 +86,7 @@ function M.find_unity_project_root(bufnr)
     return nil
   end
 
-  local project_root = vim.fs.dirname(vim.fs.dirname(found[1]))
+  local project_root = vim.fs.dirname(found[1])
   return project_root
 end
 

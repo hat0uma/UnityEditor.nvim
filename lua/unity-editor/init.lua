@@ -8,8 +8,7 @@ function M.setup(opts)
   require("unity-editor.commands").setup()
 
   -- setup config
-  local config = require("unity-editor.config")
-  opts = config.setup(opts)
+  opts = require("unity-editor.config").setup(opts)
 
   -- enable auto-refresh
   if opts.autorefresh then

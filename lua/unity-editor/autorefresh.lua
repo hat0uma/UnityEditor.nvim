@@ -10,6 +10,8 @@ function M.enable()
   globalstate.enabled = true
   vim.api.nvim_create_autocmd("BufWritePost", {
     callback = vim.schedule_wrap(function()
+      local api = require("unity-editor.api")
+
       -- check auto-refresh is enabled
       if not M.is_enabled() then
         return
@@ -22,12 +24,14 @@ function M.enable()
         return
       end
 
-      -- refresh the Unity project
-      local api = require("unity-editor.api")
-      local project_root = api.find_unity_project_root(bufnr)
-      if project_root then
-        api.refresh(project_root)
+      -- check if the current codebase is unity project and open in unity editor
+      local project_root = api.find_project_root(bufnr)
+      if not project_root or not api.is_project_open_in_unity(project_root) then
+        return
       end
+
+      -- refresh the Unity project
+      api.refresh(project_root)
     end),
     group = vim.api.nvim_create_augroup("unity-editor-auto-refresh", {}),
   })
