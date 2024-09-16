@@ -1,37 +1,25 @@
 local M = {}
 
 function M.setup()
-  vim.api.nvim_create_user_command("UnityRefresh", function()
-    require("unity-editor.api").refresh()
-  end, { desc = "[Unity] Refresh asset database" })
+  local api = require("unity-editor.api")
+  local autorefresh = require("unity-editor.autorefresh")
 
-  vim.api.nvim_create_user_command("UnityPlaymodeEnter", function()
-    require("unity-editor.api").playmode_enter()
-  end, { desc = "[Unity] Enter play mode" })
+  local commands = {
+    { name = "UnityRefresh", fn = api.refresh, desc = "Refresh asset database" },
+    { name = "UnityPlaymodeEnter", fn = api.playmode_enter, desc = "Enter play mode" },
+    { name = "UnityPlaymodeExit", fn = api.playmode_exit, desc = "Exit play mode" },
+    { name = "UnityPlaymodeToggle", fn = api.playmode_toggle, desc = "Toggle play mode" },
+    { name = "UnityGenerateSln", fn = api.generate_sln, desc = "Generate Visual Studio solution files" },
+    { name = "UnityAutoRefreshToggle", fn = autorefresh.toggle, desc = "Toggle auto-refresh" },
+    { name = "UnityAutoRefreshEnable", fn = autorefresh.enable, desc = "Enable auto-refresh" },
+    { name = "UnityAutoRefreshDisable", fn = autorefresh.disable, desc = "Disable auto-refresh" },
+  }
 
-  vim.api.nvim_create_user_command("UnityPlaymodeExit", function()
-    require("unity-editor.api").playmode_exit()
-  end, { desc = "[Unity] Exit play mode" })
-
-  vim.api.nvim_create_user_command("UnityPlaymodeToggle", function()
-    require("unity-editor.api").playmode_toggle()
-  end, { desc = "[Unity] Toggle play mode" })
-
-  vim.api.nvim_create_user_command("UnityGenerateSln", function()
-    require("unity-editor.api").generate_sln()
-  end, { desc = "[Unity] Generate Visual Studio solution files" })
-
-  vim.api.nvim_create_user_command("UnityAutoRefreshToggle", function()
-    require("unity-editor.autorefresh").toggle()
-  end, { desc = "[Unity] Toggle auto-refresh" })
-
-  vim.api.nvim_create_user_command("UnityAutoRefreshEnable", function()
-    require("unity-editor.autorefresh").enable()
-  end, { desc = "[Unity] Enable auto-refresh" })
-
-  vim.api.nvim_create_user_command("UnityAutoRefreshDisable", function()
-    require("unity-editor.autorefresh").disable()
-  end, { desc = "[Unity] Disable auto-refresh" })
+  for _, cmd in ipairs(commands) do
+    vim.api.nvim_create_user_command(cmd.name, function()
+      cmd.fn()
+    end, { desc = "[Unity] " .. cmd.desc })
+  end
 end
 
 return M

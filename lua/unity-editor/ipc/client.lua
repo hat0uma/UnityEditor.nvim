@@ -35,9 +35,10 @@ end
 --- @async
 --- Connect to Unity Editor
 --- If already connected, do nothing.
+--- @return boolean, string?
 function Client:connect_async()
   if self:is_connected() then
-    return
+    return true
   end
 
   -- load EditorInstance.json
@@ -45,7 +46,7 @@ function Client:connect_async()
   local pipename = self:_pipename(editor_instance)
 
   -- connect to Unity Editor
-  vim.print("connecting to Unity Editor: " .. pipename)
+  vim.print("Connecting to Unity Editor: " .. pipename)
   local thread = coroutine.running()
   self._pipe = vim.uv.new_pipe(false)
   self._pipe:connect(pipename, function(err)
@@ -55,14 +56,11 @@ function Client:connect_async()
   --- @type string?
   local err = coroutine.yield()
   if err then
-    vim.notify(
-      string.format("Could not connect to Unity Editor. Please make sure Unity is running.: %s", err),
-      vim.log.levels.ERROR
-    )
-    return
+    return false, err
   end
 
-  vim.notify("connected to Unity Editor")
+  vim.notify("Connected to Unity Editor")
+  return true
 end
 
 --- Close connection to Unity Editor
@@ -91,7 +89,14 @@ end
 function Client:request(method, parameters, on_response)
   local thread = coroutine.create(function() --- @async
     -- connect to Unity Editor
-    self:connect_async()
+    local ok, err = self:connect_async()
+    if not ok then
+      vim.notify(
+        string.format("Failed to connect to Unity Editor. Please make sure Unity is running. %s", err or ""),
+        vim.log.levels.ERROR
+      )
+      return
+    end
 
     -- send request
     local message = protocol.serialize_request(method, parameters)
@@ -101,14 +106,14 @@ function Client:request(method, parameters, on_response)
     local reader = StreamReader:new(self._pipe, coroutine.running())
     local data, err = reader:readline_async()
     if not data then
-      vim.notify(string.format("failed to read from Unity Editor: %s", err or ""))
+      vim.notify(string.format("Failed to read from Unity Editor: %s", err or ""))
       return
     end
 
     -- decode response
     local ok, response = pcall(protocol.deserialize_response, data)
     if not ok then
-      vim.notify(string.format("failed to decode response: %s", response or ""))
+      vim.notify(string.format("Failed to decode response: %s", response or ""))
       return
     end
 
@@ -123,7 +128,7 @@ function Client:request(method, parameters, on_response)
   -- start connection coroutine
   local ok, err = coroutine.resume(thread)
   if not ok then
-    vim.notify(string.format("failed to start connection coroutine: %s", err or ""))
+    vim.notify(string.format("Failed to start connection coroutine: %s", err or ""))
   end
 end
 
