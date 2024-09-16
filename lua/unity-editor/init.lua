@@ -4,6 +4,10 @@ local M = {}
 ---Setup
 ---@param opts? UnityEditor.Config
 function M.setup(opts)
+  -- setup commands
+  require("unity-editor.commands").setup()
+
+  -- setup config
   local config = require("unity-editor.config")
   opts = config.setup(opts)
 
