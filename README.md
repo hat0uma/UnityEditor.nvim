@@ -25,7 +25,7 @@ Unity Packge and Neovim Plugin are required to use this plugin.
 `Add package from git URL` in Unity Package Manager.
 
 ```text
-https://github.com/hat0uma/UnityEditor.nvim.git?path=Packages/com.hat0uma.ide.neovim
+https://github.com/hat0uma/UnityEditor.nvim.git?path=nvim.Unity/Assets/Neovim
 ```
 
 2. Neovim Plugin
