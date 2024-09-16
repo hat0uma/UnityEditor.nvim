@@ -1,13 +1,10 @@
 local M = {}
 
+local StreamReader = require("unity-editor.stream_reader")
+local protocol = require("unity-editor.ipc.protocol")
 local is_windows = vim.uv.os_uname().sysname:match("Windows")
 
 local PIPENAME_BASE = is_windows and "\\\\.\\pipe\\UnityEditorIPC" or "/tmp/UnityEditorIPC"
-
----@class UnityEditor.Message
----@field version string
----@field method string
----@field parameters string[]
 
 ---@class UnityEditor.EditorInstance
 ---@field process_id number
@@ -35,10 +32,10 @@ function Client:new(project_dir)
   return obj
 end
 
+--- @async
 --- Connect to Unity Editor
 --- If already connected, do nothing.
----@param on_connect fun()
-function Client:connect(on_connect)
+function Client:connect_async()
   if self:is_connected() then
     return
   end
@@ -49,10 +46,23 @@ function Client:connect(on_connect)
 
   -- connect to Unity Editor
   vim.print("connecting to Unity Editor: " .. pipename)
+  local thread = coroutine.running()
   self._pipe = vim.uv.new_pipe(false)
   self._pipe:connect(pipename, function(err)
-    self:_handle_connection(err, on_connect)
+    coroutine.resume(thread, err)
   end)
+
+  --- @type string?
+  local err = coroutine.yield()
+  if err then
+    vim.notify(
+      string.format("Could not connect to Unity Editor. Please make sure Unity is running.: %s", err),
+      vim.log.levels.ERROR
+    )
+    return
+  end
+
+  vim.notify("connected to Unity Editor")
 end
 
 --- Close connection to Unity Editor
@@ -66,21 +76,54 @@ function Client:is_connected()
   return self._pipe and vim.uv.is_active(self._pipe) or false
 end
 
---- Send message to Unity Editor
+--- Handle response from Unity Editor
+---@param data UnityEditor.ResponseMessage
+function Client:handle_response(data)
+  if data.status ~= protocol.Status.OK then
+    vim.notify(data.result, vim.log.levels.WARN)
+  end
+end
+
+--- Request to Unity Editor
 ---@param method string
 ---@param parameters string[]
-function Client:send(method, parameters)
-  local function _send()
-    local message = { version = require("unity-editor._VERSION"), method = method, parameters = parameters }
-    local payload = vim.json.encode(message)
-    self._pipe:write(payload .. "\n")
-  end
+---@param on_response? fun(data: UnityEditor.ResponseMessage)
+function Client:request(method, parameters, on_response)
+  local thread = coroutine.create(function() --- @async
+    -- connect to Unity Editor
+    self:connect_async()
 
-  -- if not connected, run after connecting
-  if not self:is_connected() then
-    self:connect(_send)
-  else
-    _send()
+    -- send request
+    local message = protocol.serialize_request(method, parameters)
+    self._pipe:write(message)
+
+    -- read response
+    local reader = StreamReader:new(self._pipe, coroutine.running())
+    local data, err = reader:readline_async()
+    if not data then
+      vim.notify(string.format("failed to read from Unity Editor: %s", err or ""))
+      return
+    end
+
+    -- decode response
+    local ok, response = pcall(protocol.deserialize_response, data)
+    if not ok then
+      vim.notify(string.format("failed to decode response: %s", response or ""))
+      return
+    end
+
+    -- handle response
+    if on_response then
+      on_response(response)
+    else
+      self:handle_response(response)
+    end
+  end)
+
+  -- start connection coroutine
+  local ok, err = coroutine.resume(thread)
+  if not ok then
+    vim.notify(string.format("failed to start connection coroutine: %s", err or ""))
   end
 end
 
@@ -88,27 +131,27 @@ end
 --- this will compile scripts and refresh asset database
 --- It works like focus on Unity Editor or press Ctrl+R
 function Client:request_refresh()
-  self:send("refresh", {})
+  self:request("refresh", {})
 end
 
 --- request Unity Editor to play game
 function Client:request_playmode_enter()
-  self:send("playmode_enter", {})
+  self:request("playmode_enter", {})
 end
 
 --- request Unity Editor to stop game
 function Client:request_playmode_exit()
-  self:send("playmode_exit", {})
+  self:request("playmode_exit", {})
 end
 
 --- request Unity Editor to toggle play game
 function Client:request_playmode_toggle()
-  self:send("playmode_toggle", {})
+  self:request("playmode_toggle", {})
 end
 
 --- generate Visual Studio solution file
 function Client:request_generate_sln()
-  self:send("generate_sln", {})
+  self:request("generate_sln", {})
 end
 
 --------------------------------------
@@ -127,37 +170,6 @@ end
 function Client:_handle_message(data)
   -- TODO: handle message from Unity Editor
   vim.notify(data)
-end
-
---- handle connection to Unity Editor
----@param err? string
----@param on_connect? fun()
-function Client:_handle_connection(err, on_connect)
-  if err then
-    vim.notify(string.format("Connection failed. Please make sure Unity is running.: %s", err), vim.log.levels.ERROR)
-    return
-  end
-
-  -- start reading from Unity Editor
-  self._pipe:read_start(function(err, data)
-    if err then
-      vim.notify(string.format("Read failed: %s", err), vim.log.levels.ERROR)
-      return
-    end
-
-    if not data then
-      self._pipe:close()
-      return
-    end
-
-    -- handle message
-    self:_handle_message(data)
-  end)
-
-  print("connected to Unity Editor")
-  if on_connect then
-    on_connect()
-  end
 end
 
 --- Load EditorInstance.json

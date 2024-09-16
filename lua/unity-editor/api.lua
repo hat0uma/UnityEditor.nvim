@@ -1,7 +1,7 @@
 ---@class UnityEditor.api
 local M = {}
 
-local cl = require("unity-editor.client")
+local cl = require("unity-editor.ipc.client")
 
 --- refresh Unity Editor asset database
 --- this will compile scripts and refresh asset database
