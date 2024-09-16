@@ -105,7 +105,7 @@ namespace NeovimEditor
             // Process message queue
             if (server.ReceiveQueue.TryDequeue(out var message))
             {
-                messageHandler.Handle(message);
+                messageHandler.Handle(message, server);
             }
         }
 

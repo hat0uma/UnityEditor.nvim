@@ -14,12 +14,29 @@ namespace NeovimEditor
     /// Since it uses JSONUtility for deserialization internally, it cannot send complex structured messages.
     /// </summary>
     [Serializable]
-    public class IPCMessage
+    public struct IPCRequestMessage
     {
         public string version;
         public string method;
         public string[] parameters;
-        public override string ToString() => $"IPCMessage(version={version}, method={method}, parameters=[{string.Join(", ", parameters)}])";
+        public override string ToString() => $"IPCRequestMessage(version={version}, method={method}, parameters=[{string.Join(", ", parameters)}])";
+    }
+
+    /// <summary>
+    /// IPC Response message type for communication between Neovim and Unity Editor.
+    /// </summary>
+    [Serializable]
+    public struct IPCResponseMessage
+    {
+        public enum Status
+        {
+            OK = 0,
+            Error = -1,
+        }
+        public string version;
+        public int status;
+        public string result;
+        public override string ToString() => $"IPCResponseMessage(version={version}, status={status}, result={result})";
     }
 
     /// <summary>
@@ -38,13 +55,13 @@ namespace NeovimEditor
         /// Message queue for receiving messages from IPC client.
         /// This queue is used to pass messages from worker thread to main thread.
         /// </summary>
-        public ConcurrentQueue<IPCMessage> ReceiveQueue { get; } = new ConcurrentQueue<IPCMessage>();
+        public ConcurrentQueue<IPCRequestMessage> ReceiveQueue { get; } = new ConcurrentQueue<IPCRequestMessage>();
 
         /// <summary>
         /// Message queue for sending messages to IPC client.
         /// This queue is used to pass messages from main thread to worker thread.
         /// </summary>
-        public ConcurrentQueue<IPCMessage> SendQueue { get; } = new ConcurrentQueue<IPCMessage>();
+        public ConcurrentQueue<IPCResponseMessage> SendQueue { get; } = new ConcurrentQueue<IPCResponseMessage>();
 
         /// <summary>
         /// Buffer for reading a line from named pipe server.
@@ -82,10 +99,7 @@ namespace NeovimEditor
                         using (var writer = new StreamWriter(server, utf8, 1024, true))
                         using (var reader = new StreamReader(server, utf8, false, 1024, true))
                         {
-                            await Task.WhenAll(
-                                HandleReceive(server, reader, token),
-                                HandleSend(server, writer, token)
-                            );
+                            await Task.WhenAll(HandleReceive(server, reader, token), HandleSend(server, writer, token));
                         }
 
                     }
@@ -130,7 +144,7 @@ namespace NeovimEditor
                 // Enqueue message to queue for main thread.
                 try
                 {
-                    var ipcMessage = JsonUtility.FromJson<IPCMessage>(message);
+                    var ipcMessage = JsonUtility.FromJson<IPCRequestMessage>(message);
                     ReceiveQueue.Enqueue(ipcMessage);
                 }
                 catch (ArgumentException e)
