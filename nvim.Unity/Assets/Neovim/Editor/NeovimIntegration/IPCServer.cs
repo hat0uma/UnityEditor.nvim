@@ -112,6 +112,7 @@ namespace NeovimEditor
                             await Task.WhenAll(HandleReceive(server, reader, token), HandleSend(server, writer, token));
                         }
                         // Debug.Log("Client disconnected");
+                        IsConnected = false;
                     }
                 }
             }

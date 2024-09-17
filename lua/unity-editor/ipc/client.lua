@@ -13,6 +13,7 @@ local PIPENAME_BASE = is_windows and "\\\\.\\pipe\\UnityEditorIPC" or "/tmp/Unit
 --- @class UnityEditor.Client
 --- @field _pipe uv_pipe_t
 --- @field _project_dir string
+--- @field _last_request? { method: string, date: string, status: "connecting" | "sending" | "receiving" | "done" | "fail" , err?: string }
 local Client = {}
 
 --- Create new Unity Editor client
@@ -22,6 +23,8 @@ function Client:new(project_dir)
   local obj = {}
   obj._pipe = vim.uv.new_pipe(false)
   obj._project_dir = project_dir
+  ---@diagnostic disable-next-line: no-unknown
+  obj._last_request = nil
 
   setmetatable(obj, self)
   self.__index = self
@@ -71,7 +74,7 @@ function Client:is_connected()
     return false
   end
 
-  return self._pipe:getpeername() ~= nil
+  return self._pipe:is_readable() == true
 end
 
 --- refresh Unity Editor asset database
@@ -163,7 +166,9 @@ function Client:_handle_response(data, err)
     return
   end
 
-  if data.status ~= protocol.Status.OK then
+  if data.status == protocol.Status.OK then
+    vim.notify(data.result, vim.log.levels.INFO)
+  else
     vim.notify(data.result, vim.log.levels.WARN)
   end
 end
@@ -178,16 +183,26 @@ function Client:_request(method, parameters, callback)
     self:_handle_response(data, err)
   end
 
+  if self._last_request and (self._last_request.status ~= "fail" and self._last_request.status ~= "done") then
+    vim.notify("Request is already in progress", vim.log.levels.WARN)
+    return
+  end
+
   local thread
   thread = coroutine.create(function() --- @async
     -- connect to Unity Editor
+    self._last_request = { method = method, date = os.date(), status = "connecting", err = nil }
     local ok, err = self:connect_async()
     if not ok then
-      callback(nil, string.format("Failed to connect to Unity Editor: %s", err or ""))
+      err = string.format("Failed to connect to Unity Editor: %s", err or "")
+      callback(nil, err)
+      self._last_request.status = "fail"
+      self._last_request.err = err
       return
     end
 
     -- send request
+    self._last_request.status = "sending"
     local message = protocol.serialize_request(method, parameters)
     self._pipe:write(message, function(err)
       coroutine.resume(thread, err)
@@ -196,27 +211,38 @@ function Client:_request(method, parameters, callback)
     -- wait for write completion
     local err = coroutine.yield() --- @type string?
     if err then
-      callback(nil, string.format("Failed to write to Unity Editor: %s", err or ""))
+      err = string.format("Failed to write to Unity Editor: %s", err or "")
+      callback(nil, err)
+      self._last_request.status = "fail"
+      self._last_request.err = err
       return
     end
 
     -- read response
+    self._last_request.status = "receiving"
     local reader = StreamReader:new(self._pipe, thread)
     local data, err = reader:readline_async()
     reader:close()
     if not data then
-      callback(nil, string.format("Failed to read from Unity Editor: %s", err or ""))
+      err = string.format("Failed to read from Unity Editor: %s", err or "")
+      callback(nil, err)
+      self._last_request.status = "fail"
+      self._last_request.err = err
       return
     end
 
     -- decode response
     local ok, response = pcall(protocol.deserialize_response, data)
     if not ok then
-      callback(string.format("Failed to decode response: %s", response or ""))
+      err = string.format("Failed to decode response: %s", response or "")
+      callback(nil, err)
+      self._last_request.status = "fail"
+      self._last_request.err = err
       return
     end
 
     -- handle response
+    self._last_request.status = "done"
     callback(response)
   end)
 
@@ -250,6 +276,18 @@ function M.get_project_client(project_dir)
     clients[project_dir] = client
   end
   return client
+end
+
+--- print debug information of all clients
+function M.debug_print_clients()
+  for project_dir, client in pairs(clients) do
+    local msg = {
+      string.format("project_dir: %s", project_dir),
+      string.format("connected: %s", client:is_connected()),
+      string.format("last_request: %s", client._last_request and vim.inspect(client._last_request) or "none"),
+    }
+    vim.notify(table.concat(msg, "\n"), vim.log.levels.INFO)
+  end
 end
 
 return M

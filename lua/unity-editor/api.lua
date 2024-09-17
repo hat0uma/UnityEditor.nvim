@@ -10,7 +10,7 @@ local cl = require("unity-editor.ipc.client")
 function M.refresh(project_dir)
   project_dir = project_dir or M.find_project_root(0)
   if not project_dir then
-    vim.notify("Unity project root not found", vim.log.levels.WARN)
+    vim.notify("This buffer is not in Unity project", vim.log.levels.WARN)
     return
   end
 
@@ -28,7 +28,7 @@ end
 function M.playmode_enter(project_dir)
   project_dir = project_dir or M.find_project_root(0)
   if not project_dir then
-    vim.notify("Unity project root not found", vim.log.levels.WARN)
+    vim.notify("This buffer is not in Unity project", vim.log.levels.WARN)
     return
   end
 
@@ -46,7 +46,7 @@ end
 function M.playmode_exit(project_dir)
   project_dir = project_dir or M.find_project_root(0)
   if not project_dir then
-    vim.notify("Unity project root not found", vim.log.levels.WARN)
+    vim.notify("This buffer is not in Unity project", vim.log.levels.WARN)
     return
   end
 
@@ -64,7 +64,7 @@ end
 function M.playmode_toggle(project_dir)
   project_dir = project_dir or M.find_project_root(0)
   if not project_dir then
-    vim.notify("Unity project root not found", vim.log.levels.WARN)
+    vim.notify("This buffer is not in Unity project", vim.log.levels.WARN)
     return
   end
 
@@ -82,7 +82,7 @@ end
 function M.generate_sln(project_dir)
   project_dir = project_dir or M.find_project_root(0)
   if not project_dir then
-    vim.notify("Unity project root not found", vim.log.levels.WARN)
+    vim.notify("This buffer is not in Unity project", vim.log.levels.WARN)
     return
   end
 
