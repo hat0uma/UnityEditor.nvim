@@ -8,8 +8,15 @@ local cl = require("unity-editor.ipc.client")
 --- It works like focus on Unity Editor or press Ctrl+R
 --- @param project_dir? string Unity project directory path
 function M.refresh(project_dir)
+  project_dir = project_dir or M.find_project_root(0)
   if not project_dir then
-    project_dir = assert(vim.uv.cwd())
+    vim.notify("Unity project root not found", vim.log.levels.WARN)
+    return
+  end
+
+  if not M.is_project_open_in_unity(project_dir) then
+    vim.notify("This project is not open in Unity Editor", vim.log.levels.WARN)
+    return
   end
 
   local client = cl.get_project_client(project_dir)
@@ -19,8 +26,15 @@ end
 --- request Unity Editor to play game
 ---@param project_dir? string Unity project directory path
 function M.playmode_enter(project_dir)
+  project_dir = project_dir or M.find_project_root(0)
   if not project_dir then
-    project_dir = assert(vim.uv.cwd())
+    vim.notify("Unity project root not found", vim.log.levels.WARN)
+    return
+  end
+
+  if not M.is_project_open_in_unity(project_dir) then
+    vim.notify("This project is not open in Unity Editor", vim.log.levels.WARN)
+    return
   end
 
   local client = cl.get_project_client(project_dir)
@@ -30,8 +44,15 @@ end
 --- request Unity Editor to stop game
 --- @param project_dir? string Unity project directory path
 function M.playmode_exit(project_dir)
+  project_dir = project_dir or M.find_project_root(0)
   if not project_dir then
-    project_dir = assert(vim.uv.cwd())
+    vim.notify("Unity project root not found", vim.log.levels.WARN)
+    return
+  end
+
+  if not M.is_project_open_in_unity(project_dir) then
+    vim.notify("This project is not open in Unity Editor", vim.log.levels.WARN)
+    return
   end
 
   local client = cl.get_project_client(project_dir)
@@ -41,8 +62,15 @@ end
 --- request Unity Editor to toggle play game
 ---@param project_dir? string Unity project directory path
 function M.playmode_toggle(project_dir)
+  project_dir = project_dir or M.find_project_root(0)
   if not project_dir then
-    project_dir = assert(vim.uv.cwd())
+    vim.notify("Unity project root not found", vim.log.levels.WARN)
+    return
+  end
+
+  if not M.is_project_open_in_unity(project_dir) then
+    vim.notify("This project is not open in Unity Editor", vim.log.levels.WARN)
+    return
   end
 
   local client = cl.get_project_client(project_dir)
@@ -52,8 +80,15 @@ end
 --- generate Visual Studio solution files
 ---@param project_dir? string Unity project directory path
 function M.generate_sln(project_dir)
+  project_dir = project_dir or M.find_project_root(0)
   if not project_dir then
-    project_dir = assert(vim.uv.cwd())
+    vim.notify("Unity project root not found", vim.log.levels.WARN)
+    return
+  end
+
+  if not M.is_project_open_in_unity(project_dir) then
+    vim.notify("This project is not open in Unity Editor", vim.log.levels.WARN)
+    return
   end
 
   local client = cl.get_project_client(project_dir)
