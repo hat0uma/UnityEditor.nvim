@@ -104,6 +104,16 @@ function Client:request_generate_sln()
   self:_request("generate_sln", {})
 end
 
+--- show status of Unity Editor client
+function Client:show_status()
+  local msg = {
+    string.format("project_dir: %s", self._project_dir),
+    string.format("connected: %s", self:is_connected()),
+    string.format("last_request: %s", self._last_request and vim.inspect(self._last_request) or "none"),
+  }
+  vim.notify(table.concat(msg, "\n"), vim.log.levels.INFO)
+end
+
 --------------------------------------
 -- private methods
 --------------------------------------
@@ -280,13 +290,8 @@ end
 
 --- print debug information of all clients
 function M.debug_print_clients()
-  for project_dir, client in pairs(clients) do
-    local msg = {
-      string.format("project_dir: %s", project_dir),
-      string.format("connected: %s", client:is_connected()),
-      string.format("last_request: %s", client._last_request and vim.inspect(client._last_request) or "none"),
-    }
-    vim.notify(table.concat(msg, "\n"), vim.log.levels.INFO)
+  for _, client in pairs(clients) do
+    client:show_status()
   end
 end
 
