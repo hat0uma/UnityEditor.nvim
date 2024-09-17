@@ -42,7 +42,7 @@ function Client:connect_async()
   local pipename = self:_pipename(editor_instance)
 
   -- connect to Unity Editor
-  vim.notify("Connecting to Unity Editor: " .. pipename)
+  print("Connecting to Unity Editor: " .. pipename)
   local thread = coroutine.running()
   self._pipe = vim.uv.new_pipe(false)
   self._pipe:connect(pipename, function(err)
@@ -55,7 +55,7 @@ function Client:connect_async()
     return false, err
   end
 
-  vim.notify("Connected to Unity Editor")
+  print("Connected to Unity Editor")
   return true
 end
 
@@ -67,7 +67,11 @@ end
 --- Check if connected to Unity Editor
 ---@return boolean
 function Client:is_connected()
-  return self._pipe and vim.uv.is_active(self._pipe) or false
+  if not self._pipe then
+    return false
+  end
+
+  return self._pipe:getpeername() ~= nil
 end
 
 --- refresh Unity Editor asset database
@@ -134,7 +138,7 @@ function Client:_load_editor_instance_json()
   end
 
   -- decode json
-  local json = vim.fn.json_decode(data)
+  local json = vim.json.decode(data)
   if type(json) ~= "table" then
     error(string.format("%s decode failed.", json_path))
   end
@@ -151,8 +155,14 @@ function Client:_load_editor_instance_json()
 end
 
 --- Handle response from Unity Editor
----@param data UnityEditor.ResponseMessage
-function Client:_handle_response(data)
+---@param data? UnityEditor.ResponseMessage
+---@param err? string
+function Client:_handle_response(data, err)
+  if not data then
+    vim.notify(assert(err), vim.log.levels.ERROR)
+    return
+  end
+
   if data.status ~= protocol.Status.OK then
     vim.notify(data.result, vim.log.levels.WARN)
   end
@@ -161,44 +171,53 @@ end
 --- Request to Unity Editor
 ---@param method string
 ---@param parameters string[]
----@param on_response? fun(data: UnityEditor.ResponseMessage)
-function Client:_request(method, parameters, on_response)
-  local thread = coroutine.create(function() --- @async
+---@param callback? fun(data?: UnityEditor.ResponseMessage, err?: string)
+function Client:_request(method, parameters, callback)
+  -- response handler
+  callback = callback or function(data, err)
+    self:_handle_response(data, err)
+  end
+
+  local thread
+  thread = coroutine.create(function() --- @async
     -- connect to Unity Editor
     local ok, err = self:connect_async()
     if not ok then
-      vim.notify(
-        string.format("Failed to connect to Unity Editor. Please make sure Unity is running. %s", err or ""),
-        vim.log.levels.ERROR
-      )
+      callback(nil, string.format("Failed to connect to Unity Editor: %s", err or ""))
       return
     end
 
     -- send request
     local message = protocol.serialize_request(method, parameters)
-    self._pipe:write(message)
+    self._pipe:write(message, function(err)
+      coroutine.resume(thread, err)
+    end)
+
+    -- wait for write completion
+    local err = coroutine.yield() --- @type string?
+    if err then
+      callback(nil, string.format("Failed to write to Unity Editor: %s", err or ""))
+      return
+    end
 
     -- read response
-    local reader = StreamReader:new(self._pipe, coroutine.running())
+    local reader = StreamReader:new(self._pipe, thread)
     local data, err = reader:readline_async()
+    reader:close()
     if not data then
-      vim.notify(string.format("Failed to read from Unity Editor: %s", err or ""))
+      callback(nil, string.format("Failed to read from Unity Editor: %s", err or ""))
       return
     end
 
     -- decode response
     local ok, response = pcall(protocol.deserialize_response, data)
     if not ok then
-      vim.notify(string.format("Failed to decode response: %s", response or ""))
+      callback(string.format("Failed to decode response: %s", response or ""))
       return
     end
 
     -- handle response
-    if on_response then
-      on_response(response)
-    else
-      self:_handle_response(response)
-    end
+    callback(response)
   end)
 
   -- start connection coroutine
