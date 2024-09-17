@@ -69,6 +69,12 @@ namespace NeovimEditor
         private byte[] readLineBuffer = new byte[1024];
 
         /// <summary>
+        /// client is connected.
+        /// NamedPipeServerStream.IsConnected cannot detect client disconnection. So use this flag.
+        /// </summary>
+        private bool IsConnected = false;
+
+        /// <summary>
         /// Start IPC server.
         /// </summary>
         public Task Start(CancellationToken token)
@@ -87,21 +93,25 @@ namespace NeovimEditor
             var utf8 = new UTF8Encoding(false);
             try
             {
+                // Create server
                 while (!token.IsCancellationRequested)
                 {
-                    // Create server
                     using (var server = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous))
                     {
                         // Wait for ipc client connection
+                        // Debug.Log("Waiting for client connection");
+                        IsConnected = false;
                         await server.WaitForConnectionAsync(token);
+                        IsConnected = true;
 
                         // Handle send and receive
+                        // Debug.Log("Client connected");
                         using (var writer = new StreamWriter(server, utf8, 1024, true))
                         using (var reader = new StreamReader(server, utf8, false, 1024, true))
                         {
                             await Task.WhenAll(HandleReceive(server, reader, token), HandleSend(server, writer, token));
                         }
-
+                        // Debug.Log("Client disconnected");
                     }
                 }
             }
@@ -117,7 +127,7 @@ namespace NeovimEditor
 
         private async Task HandleSend(NamedPipeServerStream server, StreamWriter writer, CancellationToken token)
         {
-            while (!token.IsCancellationRequested && server.IsConnected)
+            while (!token.IsCancellationRequested && IsConnected)
             {
                 if (SendQueue.TryDequeue(out var ipcMessage))
                 {
@@ -131,7 +141,7 @@ namespace NeovimEditor
 
         private async Task HandleReceive(NamedPipeServerStream server, StreamReader reader, CancellationToken token)
         {
-            while (!token.IsCancellationRequested && server.IsConnected)
+            while (!token.IsCancellationRequested && IsConnected)
             {
                 // Read message from client.
                 string message = await PipeReadLine(server, token);
@@ -181,6 +191,7 @@ namespace NeovimEditor
                 if (bytesRead == 0)
                 {
                     // Client disconnected
+                    IsConnected = false;
                     break;
                 }
 
@@ -190,7 +201,9 @@ namespace NeovimEditor
                 if (c == '\n')
                 {
                     // End of message
-                    return Encoding.UTF8.GetString(readLineBuffer, 0, size - 1);
+                    var message = Encoding.UTF8.GetString(readLineBuffer, 0, size - 1);
+                    Array.Clear(readLineBuffer, 0, size);
+                    return message;
                 }
             }
             return null;
