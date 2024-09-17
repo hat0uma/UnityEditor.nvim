@@ -2,24 +2,84 @@ local M = {}
 
 function M.setup()
   local api = require("unity-editor.api")
-  local autorefresh = require("unity-editor.autorefresh")
-
   local commands = {
-    { name = "UnityRefresh", fn = api.refresh, desc = "Refresh asset database" },
-    { name = "UnityPlaymodeEnter", fn = api.playmode_enter, desc = "Enter play mode" },
-    { name = "UnityPlaymodeExit", fn = api.playmode_exit, desc = "Exit play mode" },
-    { name = "UnityPlaymodeToggle", fn = api.playmode_toggle, desc = "Toggle play mode" },
-    { name = "UnityGenerateSln", fn = api.generate_sln, desc = "Generate Visual Studio solution files" },
-    { name = "UnityAutoRefreshToggle", fn = autorefresh.toggle, desc = "Toggle auto-refresh" },
-    { name = "UnityAutoRefreshEnable", fn = autorefresh.enable, desc = "Enable auto-refresh" },
-    { name = "UnityAutoRefreshDisable", fn = autorefresh.disable, desc = "Disable auto-refresh" },
+    refresh = api.refresh,
+    generate_sln = api.generate_sln,
+    playmode = {
+      enter = api.playmode_enter,
+      exit = api.playmode_exit,
+      toggle = api.playmode_toggle,
+    },
+    autorefresh = {
+      toggle = api.autorefresh.toggle,
+      enable = api.autorefresh.enable,
+      disable = api.autorefresh.disable,
+    },
   }
 
-  for _, cmd in ipairs(commands) do
-    vim.api.nvim_create_user_command(cmd.name, function()
-      cmd.fn()
-    end, { desc = "[Unity] " .. cmd.desc })
-  end
+  -- Create a command to manage Unity Editor
+  vim.api.nvim_create_user_command("Unity", function(opts)
+    local parts = vim.split(opts.args, " ", { trimempty = true })
+    if #parts == 0 then
+      return
+    end
+
+    local command_name = parts[1]
+    local sub_command = commands[command_name]
+    if not sub_command then
+      vim.notify("Unknown subcommand: " .. command_name)
+      return
+    end
+
+    if type(sub_command) == "function" then
+      sub_command()
+      return
+    end
+
+    local action = parts[2]
+    if not action then
+      vim.notify("Please specify an action: " .. table.concat(vim.tbl_keys(sub_command), ", "))
+      return
+    end
+
+    if not sub_command[action] then
+      vim.notify("Unknown action: " .. action)
+      return
+    end
+
+    sub_command[action]()
+  end, {
+    desc = "[Unity] Manage Unity Editor",
+    nargs = "?",
+    complete = function(arg_lead, cmd_line, cursor_pos)
+      -- "Unity   aa"
+      --   - arg_lead = "aa"
+      --   - cmd_line = "Unity   aa"
+      --   - cursor_pos = 10
+      local parts = vim.split(cmd_line, " ", { trimempty = true })
+      if #parts == 1 then
+        return vim.tbl_keys(commands)
+      end
+
+      -- subcommand completion
+      local command_name = parts[2]
+      if not commands[command_name] then
+        return {}
+      end
+
+      local sub_command = commands[command_name]
+      if type(sub_command) == "function" then
+        return {}
+      end
+
+      if #parts == 3 then
+        return {}
+      end
+
+      -- action completion
+      return vim.tbl_keys(sub_command)
+    end,
+  })
 end
 
 return M
