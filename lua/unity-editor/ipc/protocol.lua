@@ -23,7 +23,7 @@ M.Status = {
 function M.serialize_request(method, parameters)
   -- Treat the newline code as the end of the message.
   return vim.json.encode({
-    version = require("unity-editor.ipc._VERSION"),
+    version = require("unity-editor.package_info").version,
     method = method,
     parameters = parameters,
   }) .. "\n"

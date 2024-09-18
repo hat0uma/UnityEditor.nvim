@@ -198,9 +198,9 @@ function Client:_request(method, parameters, callback)
     return
   end
 
-  local thread
-  thread = coroutine.create(function() --- @async
+  local run = function() --- @async
     -- connect to Unity Editor
+    local thread = coroutine.running()
     self._last_request = { method = method, date = os.date(), status = "connecting", err = nil }
     local ok, err = self:connect_async()
     if not ok then
@@ -254,6 +254,12 @@ function Client:_request(method, parameters, callback)
     -- handle response
     self._last_request.status = "done"
     callback(response)
+  end
+
+  local thread = coroutine.create(function()
+    xpcall(run, function(err)
+      vim.notify(string.format("Failed to request Unity Editor: %s", err or ""), vim.log.levels.ERROR)
+    end)
   end)
 
   -- start connection coroutine

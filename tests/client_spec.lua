@@ -1,6 +1,6 @@
 ---@diagnostic disable: await-in-sync
 local Client = require("unity-editor.ipc.client").Client
-local version = require("unity-editor.ipc._VERSION")
+local package_info = require("unity-editor.package_info")
 local is_windows = vim.uv.os_uname().sysname:match("Windows")
 
 --- Create a dummy server for testing
@@ -73,8 +73,8 @@ describe("UnityEditor.Client with Dummy Server", function()
   end)
 
   it("should send request and handle response", function()
-    local request_data = { method = "test_method", parameters = {}, version = version }
-    local response_data = { result = "ok", status = 0, version = version }
+    local request_data = { method = "test_method", parameters = {}, version = package_info.version }
+    local response_data = { result = "ok", status = 0, version = package_info.version }
 
     -- Start the dummy server
     server = start_dummy_server(pipename, function(client, data)
