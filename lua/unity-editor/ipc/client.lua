@@ -131,29 +131,32 @@ function Client:_load_editor_instance_json()
   local json_path = vim.fs.joinpath(self._project_dir, "Library/EditorInstance.json")
 
   -- open EditorInstance.json
-  local f, err = vim.uv.fs_open(json_path, "r", 438)
+  local err, f
+  f, err = vim.uv.fs_open(json_path, "r", 438)
   if not f then
-    error(string.format("%s open failed.", json_path))
+    error(string.format("%s open failed. %s", json_path, err))
   end
 
   -- get file size
-  local stat, err = vim.uv.fs_fstat(f)
+  local stat
+  stat, err = vim.uv.fs_fstat(f)
   if not stat then
     vim.uv.fs_close(f)
-    error(string.format("%s stat failed.", json_path))
+    error(string.format("%s stat failed. %s", json_path, err))
   end
 
   -- read file
-  local data, err = vim.uv.fs_read(f, stat.size, 0)
+  local data
+  data, err = vim.uv.fs_read(f, stat.size, 0)
   vim.uv.fs_close(f)
   if type(data) ~= "string" then
-    error(string.format("%s read failed.", json_path))
+    error(string.format("%s read failed. %s", json_path, err))
   end
 
   -- decode json
   local json = vim.json.decode(data)
   if type(json) ~= "table" then
-    error(string.format("%s decode failed.", json_path))
+    error(string.format("%s decode failed. %s", json_path, err))
   end
 
   --  json must have process_id,version,app_path,app_contents_path
@@ -201,8 +204,11 @@ function Client:_request(method, parameters, callback)
   local run = function() --- @async
     -- connect to Unity Editor
     local thread = coroutine.running()
+
+    ---@diagnostic disable-next-line: assign-type-mismatch
     self._last_request = { method = method, date = os.date(), status = "connecting", err = nil }
-    local ok, err = self:connect_async()
+    local ok, err
+    ok, err = self:connect_async()
     if not ok then
       err = string.format("Failed to connect to Unity Editor: %s", err or "")
       callback(nil, err)
@@ -214,12 +220,12 @@ function Client:_request(method, parameters, callback)
     -- send request
     self._last_request.status = "sending"
     local message = protocol.serialize_request(method, parameters)
-    self._pipe:write(message, function(err)
-      coroutine.resume(thread, err)
+    self._pipe:write(message, function(write_err)
+      coroutine.resume(thread, write_err)
     end)
 
     -- wait for write completion
-    local err = coroutine.yield() --- @type string?
+    err = coroutine.yield() --- @type string?
     if err then
       err = string.format("Failed to write to Unity Editor: %s", err or "")
       callback(nil, err)
@@ -231,7 +237,8 @@ function Client:_request(method, parameters, callback)
     -- read response
     self._last_request.status = "receiving"
     local reader = StreamReader:new(self._pipe, thread)
-    local data, err = reader:readline_async()
+    local data
+    data, err = reader:readline_async()
     reader:close()
     if not data then
       err = string.format("Failed to read from Unity Editor: %s", err or "")
@@ -242,7 +249,8 @@ function Client:_request(method, parameters, callback)
     end
 
     -- decode response
-    local ok, response = pcall(protocol.deserialize_response, data)
+    local response
+    ok, response = pcall(protocol.deserialize_response, data)
     if not ok then
       err = string.format("Failed to decode response: %s", response or "")
       callback(nil, err)

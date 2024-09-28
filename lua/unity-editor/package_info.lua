@@ -26,20 +26,23 @@ local function load_package_json()
   path = vim.fs.normalize(path)
 
   -- open file
-  local f, err = vim.uv.fs_open(path, "r", 438)
+  local f, err
+  f, err = vim.uv.fs_open(path, "r", 438)
   if not f then
     return nil, string.format("Failed to open %s: %s", path, err)
   end
 
   -- get file size
-  local stat, err = vim.uv.fs_fstat(f)
+  local stat
+  stat, err = vim.uv.fs_fstat(f)
   if not stat then
     vim.uv.fs_close(f)
     return nil, string.format("Failed to stat %s: %s", path, err)
   end
 
   -- read file
-  local text, err = vim.uv.fs_read(f, stat.size, 0)
+  local text
+  text, err = vim.uv.fs_read(f, stat.size, 0)
   vim.uv.fs_close(f)
   if not text then
     return nil, string.format("Failed to read %s: %s", path, err)

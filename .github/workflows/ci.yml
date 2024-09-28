@@ -10,20 +10,41 @@ jobs:
   stylua:
     name: Check code style
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: JohnnyMorganz/stylua-action@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: latest
-          args: --config-path=.stylua.toml --check ./lua
+          args: --config-path=.stylua.toml ./lua ./tests
+      - uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "style(format): fix code style"
+          branch: ${{ github.head_ref }}
+      - uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
+
+  selene:
+    name: Lint code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: NTBBloodbath/selene-action@v1.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --color always ./lua ./tests
 
   tests:
     name: Run tests
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        neovim_version: ["nightly"]
+        # neovim_version: ["nightly"]
+        neovim_version: ["v0.10.1"]
 
     steps:
       - uses: actions/checkout@v4
