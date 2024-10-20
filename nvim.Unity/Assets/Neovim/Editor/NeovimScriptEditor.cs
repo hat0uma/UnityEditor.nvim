@@ -164,7 +164,7 @@ namespace NeovimEditor
 
             // open file in existing neovim server or open new neovim window.
             var neovimServer = NeovimCommand.GetExistNeovimServer();
-            if (neovimServer == null)
+            if (string.IsNullOrEmpty(neovimServer))
             {
                 NeovimCommand.OpenNewInstance(filePath, line, column);
             }

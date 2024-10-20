@@ -21,16 +21,27 @@ namespace NeovimEditor
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 var neovimServer = Directory.EnumerateFiles(@"\\.\pipe\").FirstOrDefault(p => Regex.IsMatch(p, @"\\\\.\\pipe\\nvim\.\d+\.\d+"));
-                if (neovimServer != null)
-                {
-                    return neovimServer;
-                }
+                return neovimServer;
             }
             else
             {
-                // TODO: implement for other platforms.
+                // find the Neovim server socket.
+                // pattens are:
+                //  - ${XDG_RUNTIME_DIR}/nvim.{pid}.<number>
+                //  - /tmp/nvim.${USER}/<RANDOM>/nvim.{pid}.<number>
+                var xdgRuntimeDir = System.Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
+                if (!string.IsNullOrEmpty(xdgRuntimeDir))
+                {
+                    var neovimServer = Directory.EnumerateFiles(xdgRuntimeDir).FirstOrDefault(p => Regex.IsMatch(p, @"nvim\.\d+\.\d+"));
+                    return neovimServer;
+                }
+                else
+                {
+                    var userName = System.Environment.UserName;
+                    var neovimServer = Directory.EnumerateFiles($"/tmp/nvim.{userName}", "*", SearchOption.AllDirectories).FirstOrDefault();
+                    return neovimServer;
+                }
             }
-            return null;
         }
 
 
