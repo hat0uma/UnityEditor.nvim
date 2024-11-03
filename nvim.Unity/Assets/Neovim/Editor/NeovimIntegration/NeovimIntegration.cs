@@ -8,6 +8,21 @@ using UnityEngine;
 
 namespace NeovimEditor
 {
+    /// <summary>
+    /// package.json structure
+    /// </summary>
+    public class Package
+    {
+        public string name;
+        public string version;
+        public string displayName;
+        public string description;
+        public string unity;
+        public string author;
+        public string repository;
+        public string license;
+    }
+
     [InitializeOnLoad]
     public class NeovimIntegration
     {
@@ -16,10 +31,15 @@ namespace NeovimEditor
         /// </summary>
         static NeovimIntegration()
         {
-            var instance = new NeovimIntegration();
+            var package = LoadPackageJson();
+            var refreshProvider = new RefreshProvider();
+            var playmodeProvider = new PlaymodeProvider();
+            var instance = new NeovimIntegration(refreshProvider, playmodeProvider, package);
 
             // Register update callback
             EditorApplication.update += instance.Update;
+            EditorApplication.update += refreshProvider.Update;
+            EditorApplication.update += playmodeProvider.Update;
 
             // Stop server on domain unload
             // This is called when Unity Editor is closed, compiled, or entering play mode.
@@ -27,6 +47,11 @@ namespace NeovimEditor
             {
                 instance.DisposeServer();
             };
+
+            refreshProvider.onRefreshCompleted += () => instance.SendResponse("Refreshed");
+            refreshProvider.onGenerateSolutionCompleted += () => instance.SendResponse("Solution generated");
+            playmodeProvider.onPlaymodeEnter += () => instance.SendResponse("Playmode entered");
+            playmodeProvider.onPlaymodeExit += () => instance.SendResponse("Playmode exited");
         }
 
         /// <summary>
@@ -50,9 +75,20 @@ namespace NeovimEditor
         private IExternalCodeEditor prevCodeEditor;
 
         /// <summary>
-        /// Neovim message handler.
+        /// Package information from package.json.
         /// </summary>
-        private NeovimMessageHandler messageHandler = new NeovimMessageHandler(LoadPackageJson());
+        private Package package;
+        private RefreshProvider refreshProvider;
+        private PlaymodeProvider playmodeProvider;
+
+        private const string LastRequestIdKey = "NeovimEditor.LastRequestId";
+
+        public NeovimIntegration(RefreshProvider refreshProvider, PlaymodeProvider playmodeProvider, Package package)
+        {
+            this.refreshProvider = refreshProvider;
+            this.playmodeProvider = playmodeProvider;
+            this.package = package;
+        }
 
         /// <summary>
         /// Update for Editor.
@@ -106,7 +142,7 @@ namespace NeovimEditor
             // Process message queue
             if (server.ReceiveQueue.TryDequeue(out var message))
             {
-                messageHandler.Handle(message, server);
+                HandleMessages(message);
             }
         }
 
@@ -159,6 +195,66 @@ namespace NeovimEditor
             string json = File.ReadAllText(packageJsonPath);
             var packageInfo = JsonUtility.FromJson<Package>(json);
             return packageInfo;
+        }
+
+        /// <summary>
+        /// Handle IPC message
+        /// </summary>
+        /// <param name="message">Received message</param>
+        /// <returns></returns>
+        public void HandleMessages(IPCRequestMessage message)
+        {
+            // Debug.Log($"Received message: {message}");
+            if (message.version != package.version)
+            {
+                var result = $"Version mismatch: Expected {package.version}, but received {message.version}";
+                Debug.LogWarning("[Neovim] " + result);
+                SendResponse(result, IPCResponseMessage.Status.Error);
+                return;
+            }
+
+            SessionState.SetInt(LastRequestIdKey, message.id);
+
+            switch (message.method)
+            {
+                case "refresh":
+                    refreshProvider.Refresh();
+                    break;
+
+                case "playmode_enter":
+                    playmodeProvider.EnterPlaymode();
+                    break;
+
+                case "playmode_exit":
+                    playmodeProvider.ExitPlaymode();
+                    break;
+
+                case "playmode_toggle":
+                    playmodeProvider.TogglePlaymode();
+                    break;
+
+                case "generate_sln":
+                    refreshProvider.GenerateSolution();
+                    break;
+
+                default:
+                    var result = $"Unknown message method: {message.method}";
+                    Debug.LogWarning("[Neovim] " + result);
+                    SendResponse(result, IPCResponseMessage.Status.Error);
+                    break;
+            }
+        }
+
+        private void SendResponse(string result, IPCResponseMessage.Status status = IPCResponseMessage.Status.OK)
+        {
+            var message = new IPCResponseMessage
+            {
+                id = SessionState.GetInt(LastRequestIdKey, -1),
+                version = package.version,
+                status = (int)status,
+                result = result
+            };
+            server.SendQueue.Enqueue(message);
         }
     }
 }

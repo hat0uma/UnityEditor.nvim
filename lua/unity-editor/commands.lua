@@ -14,6 +14,10 @@ local commands = {
     enable = api.autorefresh.enable,
     disable = api.autorefresh.disable,
   },
+  status = {
+    show = api.show_status,
+    reset = api.reset_status,
+  }
 }
 
 --- get subcommand completions
@@ -46,11 +50,14 @@ function M.setup()
   -- Create a command to manage Unity Editor
   vim.api.nvim_create_user_command("Unity", function(opts)
     local parts = vim.split(opts.args, " ", { trimempty = true })
+
+    -- If no subcommand is specified, show the list of subcommands
     if #parts == 0 then
       vim.notify("Please specify: " .. table.concat(vim.tbl_keys(commands), ", "))
       return
     end
 
+    -- If the specified subcommand does not exist, show an error message
     local command_name = parts[1]
     local sub_command = commands[command_name]
     if not sub_command then
@@ -58,17 +65,20 @@ function M.setup()
       return
     end
 
+    -- If the specified subcommand is a function, execute it
     if type(sub_command) == "function" then
       sub_command()
       return
     end
 
+    -- If no action is specified, show the list of actions
     local action = parts[2]
     if not action then
       vim.notify("Please specify: " .. table.concat(vim.tbl_keys(sub_command), ", "))
       return
     end
 
+    -- If the specified action does not exist, show an error message
     if not sub_command[action] then
       vim.notify("Unknown action: " .. action)
       return

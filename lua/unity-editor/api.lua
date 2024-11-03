@@ -100,6 +100,20 @@ function M.find_project_root(bufnr)
   return project_root
 end
 
+--- Show status of Unity Editor client.
+function M.show_status()
+  for _, client in pairs(cl.get_clients()) do
+    client:show_status()
+  end
+end
+
+--- Reset status of Unity Editor client.
+function M.reset_status()
+  for _, client in pairs(cl.get_clients()) do
+    client:reset_status()
+  end
+end
+
 M.autorefresh = require("unity-editor.autorefresh")
 
 return M

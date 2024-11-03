@@ -4,6 +4,13 @@ local is_windows = vim.uv.os_uname().sysname:match("Windows")
 
 local PIPENAME_BASE = is_windows and "\\\\.\\pipe\\UnityEditorIPC" or "/tmp/UnityEditorIPC"
 
+--- @class UnityEditor.RequestInfo
+--- @field id integer
+--- @field method string
+--- @field date string
+--- @field status "connecting" | "sending" | "receiving" | "done" | "fail"
+--- @field err? string
+
 ---@class UnityEditor.EditorInstance
 ---@field process_id number
 ---@field version string
@@ -13,7 +20,8 @@ local PIPENAME_BASE = is_windows and "\\\\.\\pipe\\UnityEditorIPC" or "/tmp/Unit
 --- @class UnityEditor.Client
 --- @field _pipe uv_pipe_t
 --- @field _project_dir string
---- @field _last_request? { method: string, date: string, status: "connecting" | "sending" | "receiving" | "done" | "fail" , err?: string }
+--- @field _request_id integer
+--- @field _last_request? UnityEditor.RequestInfo
 local Client = {}
 
 --- Create new Unity Editor client
@@ -23,6 +31,7 @@ function Client:new(project_dir)
   local obj = {}
   obj._pipe = vim.uv.new_pipe(false)
   obj._project_dir = project_dir
+  obj._request_id = 0
   ---@diagnostic disable-next-line: no-unknown
   obj._last_request = nil
 
@@ -74,7 +83,7 @@ function Client:is_connected()
     return false
   end
 
-  return self._pipe:is_readable() == true
+  return self._pipe:is_readable() and self._pipe:is_writable()
 end
 
 --- refresh Unity Editor asset database
@@ -112,6 +121,14 @@ function Client:show_status()
     string.format("last_request: %s", self._last_request and vim.inspect(self._last_request) or "none"),
   }
   vim.notify(table.concat(msg, "\n"), vim.log.levels.INFO)
+end
+
+--- reset status of Unity Editor client
+function Client:reset_status()
+  self._last_request = nil
+  if self:is_connected() then
+    self:close()
+  end
 end
 
 --------------------------------------
@@ -180,7 +197,7 @@ function Client:_handle_response(data, err)
   end
 
   if data.status == protocol.Status.OK then
-    vim.notify(data.result, vim.log.levels.INFO)
+    print(data.result)
   else
     vim.notify(data.result, vim.log.levels.WARN)
   end
@@ -191,7 +208,6 @@ end
 ---@param parameters string[]
 ---@param callback? fun(data?: UnityEditor.ResponseMessage, err?: string)
 function Client:_request(method, parameters, callback)
-  -- response handler
   callback = callback or function(data, err)
     self:_handle_response(data, err)
   end
@@ -201,12 +217,21 @@ function Client:_request(method, parameters, callback)
     return
   end
 
-  local run = function() --- @async
-    -- connect to Unity Editor
+  local function run() --- @async
     local thread = coroutine.running()
 
-    ---@diagnostic disable-next-line: assign-type-mismatch
-    self._last_request = { method = method, date = os.date(), status = "connecting", err = nil }
+    -- set last request info
+    self._request_id = self._request_id + 1
+    self._last_request = {
+      id = self._request_id,
+      method = method,
+      ---@diagnostic disable-next-line: assign-type-mismatch
+      date = os.date(),
+      status = "connecting",
+      err = nil,
+    }
+
+    -- connect to Unity Editor
     local ok, err
     ok, err = self:connect_async()
     if not ok then
@@ -219,7 +244,7 @@ function Client:_request(method, parameters, callback)
 
     -- send request
     self._last_request.status = "sending"
-    local message = protocol.serialize_request(method, parameters)
+    local message = protocol.serialize_request(method, parameters, self._request_id)
     self._pipe:write(message, function(write_err)
       coroutine.resume(thread, write_err)
     end)
@@ -236,23 +261,10 @@ function Client:_request(method, parameters, callback)
 
     -- read response
     self._last_request.status = "receiving"
-    local reader = StreamReader:new(self._pipe, thread)
-    local data
-    data, err = reader:readline_async()
-    reader:close()
-    if not data then
-      err = string.format("Failed to read from Unity Editor: %s", err or "")
-      callback(nil, err)
-      self._last_request.status = "fail"
-      self._last_request.err = err
-      return
-    end
-
-    -- decode response
     local response
-    ok, response = pcall(protocol.deserialize_response, data)
-    if not ok then
-      err = string.format("Failed to decode response: %s", response or "")
+    response, err = self:_read_response(10, 500)
+    if not response then
+      err = string.format("Failed to read from Unity Editor: %s", err or "")
       callback(nil, err)
       self._last_request.status = "fail"
       self._last_request.err = err
@@ -275,6 +287,64 @@ function Client:_request(method, parameters, callback)
   if not ok then
     vim.notify(string.format("Failed to start connection coroutine: %s", err or ""))
   end
+end
+
+--- @async
+--- Read response from Unity Editor
+---@param retry_count integer number of retry
+---@param retry_interval integer interval of retry in milliseconds
+---@return UnityEditor.ResponseMessage? response, string? err
+function Client:_read_response(retry_count, retry_interval)
+  local thread = coroutine.running()
+
+  local response, err ---@type UnityEditor.ResponseMessage?, string?
+  for i = 1, retry_count do
+    -- read message from pipe
+    local reader = StreamReader:new(self._pipe, thread)
+    local data
+    data, err = reader:readline_async()
+    if data then
+      -- decode response
+      local ok
+      ok, response = pcall(protocol.deserialize_response, data)
+      if not ok then
+        data = nil
+        err = string.format("Failed to decode response: %s", response or "")
+        break
+      end
+
+      -- if response id is not matched, ignore and wait for next response
+      -- otherwise, accept response
+      if response.id ~= self._request_id then
+        data = nil
+      else
+        break
+      end
+    end
+
+    -- close pipe and reconnect
+    local msg = string.format("(%d/%d) Retrying... %s", i, retry_count, err or "")
+    print(msg)
+    self:_wait_for_milliseconds(retry_interval)
+    self:close()
+    self:connect_async()
+  end
+
+  return response, err
+end
+
+---@async
+--- Wait for ms milliseconds
+---@param ms integer milliseconds
+function Client:_wait_for_milliseconds(ms)
+  local thread = coroutine.running()
+  vim.defer_fn(
+    vim.schedule_wrap(function()
+      coroutine.resume(thread)
+    end),
+    ms
+  )
+  coroutine.yield()
 end
 
 --------------------------------------
@@ -302,11 +372,10 @@ function M.get_project_client(project_dir)
   return client
 end
 
---- print debug information of all clients
-function M.debug_print_clients()
-  for _, client in pairs(clients) do
-    client:show_status()
-  end
+--- get all clients
+---@return table<string,UnityEditor.Client>
+function M.get_clients()
+  return clients
 end
 
 return M
