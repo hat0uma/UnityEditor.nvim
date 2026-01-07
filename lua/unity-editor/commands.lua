@@ -14,10 +14,6 @@ local commands = {
     enable = api.autorefresh.enable,
     disable = api.autorefresh.disable,
   },
-  status = {
-    show = api.show_status,
-    reset = api.reset_status,
-  },
 }
 
 --- get subcommand completions

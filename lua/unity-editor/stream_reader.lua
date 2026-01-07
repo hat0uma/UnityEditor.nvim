@@ -37,22 +37,24 @@ local Bytes = {
 ---`max_size` is exceeded, the line is returned as is.
 ---Reading is done in units of `vim.uv.recv_buffer_size()`, so note that the length of the returned string may be up to max_size + `vim.uv.recv_buffer_size()`.
 ---@param max_size? integer The maximum size of the line to read.
+---@param timeout_ms? integer Timeout in milliseconds. If nil, no timeout.
 ---@return string? line, string? err_msg
-function StreamReader:readline_async(max_size)
+function StreamReader:readline_async(max_size, timeout_ms)
   return self:_read_and_pop_async(function()
     return self:_pop_line_from_buffer(max_size)
-  end)
+  end, timeout_ms)
 end
 
 ---@async
 ---Read data asynchronously
 ---*This function must be called within a coroutine.*
 ---@param size integer
+---@param timeout_ms? integer Timeout in milliseconds. If nil, no timeout.
 ---@return string? line, string? err_msg
-function StreamReader:read_async(size)
+function StreamReader:read_async(size, timeout_ms)
   return self:_read_and_pop_async(function()
     return self:_pop_data_from_buffer(size)
-  end)
+  end, timeout_ms)
 end
 
 --- Pop a line from the buffer
@@ -90,10 +92,11 @@ end
 ---@async
 ---Read a line, but skip empty line
 ---@param max_size? integer The maximum size of the line to read.
+---@param timeout_ms? integer Timeout in milliseconds. If nil, no timeout.
 ---@return string? line ,string? err_msg
-function StreamReader:readline_skip_empty_async(max_size)
+function StreamReader:readline_skip_empty_async(max_size, timeout_ms)
   while true do
-    local line, err_msg = self:readline_async(max_size)
+    local line, err_msg = self:readline_async(max_size, timeout_ms)
     if not line then
       return nil, err_msg
     end
@@ -120,8 +123,9 @@ end
 ---@async
 ---Read data from the stream asynchronously.
 ---@param read_fn fun():string?
+---@param timeout_ms? integer Timeout in milliseconds. If nil, no timeout.
 ---@return string? line, string? err_msg
-function StreamReader:_read_and_pop_async(read_fn)
+function StreamReader:_read_and_pop_async(read_fn, timeout_ms)
   -- if there is expected data in the buffer, return the line
   local buffered_data = read_fn()
   if buffered_data then
@@ -133,8 +137,30 @@ function StreamReader:_read_and_pop_async(read_fn)
     return nil, "stream is already reading."
   end
 
+  -- setup timeout timer
+  local timer = nil ---@type uv.uv_timer_t?
+  local timed_out = false
+  if timeout_ms and timeout_ms > 0 then
+    timer = vim.uv.new_timer()
+    timer:start(
+      timeout_ms,
+      0,
+      vim.schedule_wrap(function()
+        if self._reading then
+          timed_out = true
+          coroutine.resume(self._thread, nil, "timeout")
+        end
+      end)
+    )
+  end
+
   -- otherwise, read from the stream
   local read_start_ok, read_start_err = self._stream:read_start(vim.schedule_wrap(function(err, data)
+    -- ignore if already timed out
+    if timed_out then
+      return
+    end
+
     if err then
       return coroutine.resume(self._thread, nil, err)
     end
@@ -157,6 +183,10 @@ function StreamReader:_read_and_pop_async(read_fn)
   end))
 
   if not read_start_ok then
+    if timer then
+      timer:stop()
+      timer:close()
+    end
     return nil, read_start_err
   end
 
@@ -165,6 +195,12 @@ function StreamReader:_read_and_pop_async(read_fn)
   local data, err = coroutine.yield() ---@type string? ,string?
   self._reading = false
   self._stream:read_stop()
+
+  -- cleanup timer
+  if timer then
+    timer:stop()
+    timer:close()
+  end
 
   if coroutine.status(self._thread) == "dead" then
     return nil, "coroutine dead"
