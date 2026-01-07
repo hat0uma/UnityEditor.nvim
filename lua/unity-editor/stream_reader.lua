@@ -1,5 +1,5 @@
 ---@class UnityEditor.StreamReader
----@field _stream uv_stream_t
+---@field _stream uv.uv_stream_t
 ---@field _buffer string
 ---@field _reading boolean
 ---@field _thread thread
@@ -7,7 +7,7 @@
 local StreamReader = {}
 
 --- Create a new StreamReader object.
----@param stream uv_stream_t The stream to read from.
+---@param stream uv.uv_stream_t The stream to read from.
 ---@param thread thread The coroutine to run the reader.
 ---@return UnityEditor.StreamReader
 function StreamReader:new(stream, thread)

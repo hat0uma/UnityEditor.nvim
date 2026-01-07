@@ -18,7 +18,7 @@ local PIPENAME_BASE = is_windows and "\\\\.\\pipe\\UnityEditorIPC" or "/tmp/Unit
 ---@field app_contents_path string
 
 --- @class UnityEditor.Client
---- @field _pipe uv_pipe_t
+--- @field _pipe uv.uv_pipe_t
 --- @field _project_dir string
 --- @field _request_id integer
 --- @field _last_request? UnityEditor.RequestInfo
