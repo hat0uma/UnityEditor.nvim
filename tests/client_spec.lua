@@ -5,10 +5,10 @@ local is_windows = vim.uv.os_uname().sysname:match("Windows")
 
 --- Create a dummy server for testing
 ---@param pipename string
----@param on_receive? fun(client: uv_pipe_t, data: string)
----@return uv_pipe_t
+---@param on_receive? fun(client: uv.uv_pipe_t, data: string)
+---@return uv.uv_pipe_t
 local function start_dummy_server(pipename, on_receive)
-  local server = vim.uv.new_pipe(false)
+  local server = assert(vim.uv.new_pipe(false))
   assert(server:bind(pipename))
   server:listen(128, function(listen_err)
     assert(not listen_err, listen_err)
@@ -34,7 +34,7 @@ describe("UnityEditor.Client with Dummy Server", function()
   local thread = coroutine.running()
 
   -- Start the dummy server before running tests
-  local server ---@type uv_pipe_t?
+  local server ---@type uv.uv_pipe_t?
   after_each(function()
     if server then
       server:close()
@@ -73,8 +73,8 @@ describe("UnityEditor.Client with Dummy Server", function()
   end)
 
   it("should send request and handle response", function()
-    local request_data = { method = "test_method", parameters = {}, version = package_info.version }
-    local response_data = { result = "ok", status = 0, version = package_info.version }
+    local request_data = { id = 1, method = "test_method", parameters = {}, version = package_info.version }
+    local response_data = { id = 1, result = "ok", status = 0, version = package_info.version }
 
     -- Start the dummy server
     server = start_dummy_server(pipename, function(client, data)
@@ -85,7 +85,7 @@ describe("UnityEditor.Client with Dummy Server", function()
 
     -- Create a client and send a request
     local client = Client:new(project_dir)
-    client:_request(request_data.method, request_data.parameters, function(data, err)
+    client:request(request_data.method, request_data.parameters, function(data, err)
       assert.is_nil(err)
       assert.are.same(data, response_data)
       coroutine.resume(thread)

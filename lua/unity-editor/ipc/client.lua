@@ -221,7 +221,7 @@ function Client:_read_response(request_id, readline_timeout)
   -- decode response
   local ok, response = pcall(protocol.deserialize_response, data)
   if not ok then
-    return nil, string.format("Failed to decode response: %s", data or "")
+    return nil, string.format("Failed to decode response: %s(%s)", response, data or "")
   end
 
   -- if response id is not matched, ignore and wait for next response
