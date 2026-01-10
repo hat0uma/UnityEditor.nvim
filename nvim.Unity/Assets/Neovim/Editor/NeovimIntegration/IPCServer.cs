@@ -80,12 +80,6 @@ namespace NeovimEditor
         /// </summary>
         public ConcurrentQueue<IPCResponseMessage> SendQueue { get; } = new ConcurrentQueue<IPCResponseMessage>();
 
-        /// <summary>
-        /// client is connected.
-        /// NamedPipeServerStream.IsConnected cannot detect client disconnection. So use this flag.
-        /// </summary>
-        private bool isConnected = false;
-
         private static readonly Encoding utf8 = new UTF8Encoding(false);
 
         /// <summary>
@@ -110,6 +104,7 @@ namespace NeovimEditor
                     catch (Exception e)
                     {
                         Debug.LogWarning($"Exception in Neovim IPC server loop: {e}");
+                        await Task.Delay(10, token);
                     }
                 }
             }, token);
@@ -117,7 +112,6 @@ namespace NeovimEditor
 
         /// <summary>
         /// Server loop
-        /// This method is blocking. It should be called in a separate thread.
         /// It will receive messages from ipc client and enqueue them to message queue.
         /// </summary>
         private async Task Loop(CancellationToken token)
@@ -125,26 +119,41 @@ namespace NeovimEditor
             // Create server
             using (var server = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous))
             {
-                // Wait for ipc client connection
+                // Wait for client connection
                 // Debug.Log("Waiting for client connection");
-                isConnected = false;
                 await server.WaitForConnectionAsync(token);
-                isConnected = true;
+                // Debug.Log("Client connected");
 
                 // Handle send and receive
-                // Debug.Log("Client connected");
-                var receiveTask = HandleReceive(server, token);
-                var sendTask = HandleSend(server, token);
-                await Task.WhenAll(receiveTask, sendTask);
+                using (var cts = CancellationTokenSource.CreateLinkedTokenSource(token))
+                {
+                    var receiveTask = HandleReceive(server, cts.Token);
+                    var sendTask = HandleSend(server, cts.Token);
+
+                    // Wait until disconnect
+                    var completedTask = await Task.WhenAny(receiveTask, sendTask);
+
+                    // Error Logging
+                    if (completedTask.IsFaulted && completedTask.Exception != null)
+                    {
+                        Debug.Log($"Client handler error: ${completedTask.Exception.Message}");
+                    }
+
+                    cts.Cancel();
+                    if (receiveTask != null && sendTask != null)
+                    {
+                        await Task.WhenAll(receiveTask, sendTask);
+                    }
+                }
 
                 // Debug.Log("Client disconnected");
-                isConnected = false;
             }
         }
 
         private async Task HandleSend(NamedPipeServerStream server, CancellationToken token)
         {
-            while (!token.IsCancellationRequested && isConnected)
+            var header = new byte[HeaderSize];
+            while (!token.IsCancellationRequested)
             {
                 if (SendQueue.TryDequeue(out var ipcMessage))
                 {
@@ -152,7 +161,6 @@ namespace NeovimEditor
                     var payload = utf8.GetBytes(json);
 
                     // Build header: Magic (4 bytes) + Length (4 bytes, little-endian)
-                    var header = new byte[HeaderSize];
                     Array.Copy(Magic, 0, header, 0, 4);
                     var lengthBytes = BitConverter.GetBytes(payload.Length);
                     Array.Copy(lengthBytes, 0, header, 4, 4);
@@ -168,7 +176,7 @@ namespace NeovimEditor
 
         private async Task HandleReceive(NamedPipeServerStream server, CancellationToken token)
         {
-            while (!token.IsCancellationRequested && isConnected)
+            while (!token.IsCancellationRequested)
             {
                 // Read message from client.
                 string message = await ReadMessage(server, token);
@@ -248,7 +256,6 @@ namespace NeovimEditor
                 if (bytesRead == 0)
                 {
                     // Connection closed
-                    isConnected = false;
                     return false;
                 }
                 totalRead += bytesRead;

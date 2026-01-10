@@ -155,18 +155,20 @@ function StreamReader:_read_and_pop_async(read_fn, timeout_ms)
   end
 
   -- otherwise, read from the stream
-  local read_start_ok, read_start_err = self._stream:read_start(vim.schedule_wrap(function(err, data)
+  local read_start_ok, read_start_err = self._stream:read_start(function(err, data)
     -- ignore if already timed out
     if timed_out then
       return
     end
 
     if err then
-      return coroutine.resume(self._thread, nil, err)
+      coroutine.resume(self._thread, nil, err)
+      return
     end
 
     if not data then
-      return coroutine.resume(self._thread, nil, "stream closed.")
+      coroutine.resume(self._thread, nil, "stream closed.")
+      return
     end
 
     if self.on_receive then
@@ -178,9 +180,10 @@ function StreamReader:_read_and_pop_async(read_fn, timeout_ms)
     self._buffer = self._buffer .. data
     data = read_fn()
     if data then
-      return coroutine.resume(self._thread, data, nil)
+      coroutine.resume(self._thread, data, nil)
+      return
     end
-  end))
+  end)
 
   if not read_start_ok then
     if timer then
@@ -193,8 +196,8 @@ function StreamReader:_read_and_pop_async(read_fn, timeout_ms)
   -- Wait until resume in the callback of `start_read`.
   self._reading = true
   local data, err = coroutine.yield() ---@type string? ,string?
-  self._reading = false
   self._stream:read_stop()
+  self._reading = false
 
   -- cleanup timer
   if timer then
