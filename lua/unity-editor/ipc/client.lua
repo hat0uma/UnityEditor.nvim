@@ -204,29 +204,47 @@ end
 --- @async
 --- Read response from Unity Editor
 ---@param request_id integer
----@param readline_timeout integer
+---@param timeout_ms integer
 ---@return UnityEditor.ResponseMessage? response, string? err
-function Client:_read_response(request_id, readline_timeout)
+function Client:_read_response(request_id, timeout_ms)
   local thread = coroutine.running()
   local reader = StreamReader:new(self._pipe, thread)
-  local data, err = reader:readline_async(nil, readline_timeout)
-  if not data then
-    if err ~= "timeout" then
+
+  -- Read header (8 bytes)
+  local header, header_err = reader:read_async(protocol.HEADER_SIZE, timeout_ms)
+  if not header then
+    if header_err ~= "timeout" then
       self:close()
       self:connect_async()
     end
-    return nil, err
+    return nil, header_err
   end
 
-  -- decode response
-  local ok, response = pcall(protocol.deserialize_response, data)
+  -- Parse header
+  local payload_length, parse_err = protocol.deserialize_header(header)
+  if not payload_length then
+    return nil, parse_err
+  end
+
+  -- Read payload
+  local payload, payload_err = reader:read_async(payload_length, timeout_ms)
+  if not payload then
+    if payload_err ~= "timeout" then
+      self:close()
+      self:connect_async()
+    end
+    return nil, payload_err
+  end
+
+  -- Decode response
+  local ok, response = pcall(protocol.deserialize_response, payload)
   if not ok then
-    return nil, string.format("Failed to decode response: %s(%s)", response, data or "")
+    return nil, string.format("Failed to decode response: %s(%s)", response, payload or "")
   end
 
-  -- if response id is not matched, ignore and wait for next response
+  -- Validate response id
   if response.id ~= request_id then
-    return nil, string.format("Id Not matched: requested %d but %d. (%s)", request_id, response.id, data or "")
+    return nil, string.format("Id mismatch: expected %d, got %d", request_id, response.id)
   end
 
   return response, nil

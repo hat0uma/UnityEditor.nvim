@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Threading;
 using System.IO.Pipes;
 using System.Threading.Tasks;
@@ -47,6 +48,21 @@ namespace NeovimEditor
     public class IPCServer
     {
         /// <summary>
+        /// Protocol magic number: "UNVM"
+        /// </summary>
+        private static readonly byte[] Magic = { (byte)'U', (byte)'N', (byte)'V', (byte)'M' };
+
+        /// <summary>
+        /// Protocol header size in bytes (Magic + Length)
+        /// </summary>
+        private const int HeaderSize = 8;
+
+        /// <summary>
+        /// Maximum message payload size (1MB)
+        /// </summary>
+        private const int MaxMessageSize = 1024 * 1024;
+
+        /// <summary>
         /// Named pipe name
         /// This name should be unique per process.
         /// </summary>
@@ -65,16 +81,10 @@ namespace NeovimEditor
         public ConcurrentQueue<IPCResponseMessage> SendQueue { get; } = new ConcurrentQueue<IPCResponseMessage>();
 
         /// <summary>
-        /// Buffer for reading a line from named pipe server.
-        /// </summary>
-        private readonly byte[] readLineBuffer = new byte[1024];
-
-        /// <summary>
         /// client is connected.
         /// NamedPipeServerStream.IsConnected cannot detect client disconnection. So use this flag.
         /// </summary>
         private bool isConnected = false;
-
 
         private static readonly Encoding utf8 = new UTF8Encoding(false);
 
@@ -138,9 +148,18 @@ namespace NeovimEditor
             {
                 if (SendQueue.TryDequeue(out var ipcMessage))
                 {
-                    var message = JsonUtility.ToJson(ipcMessage) + "\n";
-                    var bytes = utf8.GetBytes(message);
-                    await server.WriteAsync(bytes, token);
+                    var json = JsonUtility.ToJson(ipcMessage);
+                    var payload = utf8.GetBytes(json);
+
+                    // Build header: Magic (4 bytes) + Length (4 bytes, little-endian)
+                    var header = new byte[HeaderSize];
+                    Array.Copy(Magic, 0, header, 0, 4);
+                    var lengthBytes = BitConverter.GetBytes(payload.Length);
+                    Array.Copy(lengthBytes, 0, header, 4, 4);
+
+                    // Send header + payload
+                    await server.WriteAsync(header, 0, HeaderSize, token);
+                    await server.WriteAsync(payload, 0, payload.Length, token);
                     await server.FlushAsync(token);
                 }
                 await Task.Delay(10, token);
@@ -152,10 +171,10 @@ namespace NeovimEditor
             while (!token.IsCancellationRequested && isConnected)
             {
                 // Read message from client.
-                string message = await PipeReadLine(server, token);
+                string message = await ReadMessage(server, token);
                 if (message == null)
                 {
-                    // client disconnected.
+                    // client disconnected or protocol error.
                     break;
                 }
 
@@ -173,48 +192,68 @@ namespace NeovimEditor
         }
 
         /// <summary>
-        /// Read a line from named pipe server.
-        /// Message max length are defined by `readLineBuffer` size.
-        /// If message is too long or client disconnected, return null.
+        /// Read a message with binary header from named pipe server.
         /// </summary>
         /// <param name="server">server</param>
         /// <param name="token">cancellation token</param>
-        /// <returns>message</returns>
-        private async Task<string> PipeReadLine(NamedPipeServerStream server, CancellationToken token)
+        /// <returns>message payload as string, or null on error/disconnect</returns>
+        private async Task<string> ReadMessage(NamedPipeServerStream server, CancellationToken token)
         {
-            // StreamReader.ReadLineAsync does not accept cancellation token, so implement it by myself.
-            // Read message from client.
-            var size = 0;
-            while (!token.IsCancellationRequested && server.IsConnected)
+            // Read header
+            var header = new byte[HeaderSize];
+            if (!await ReadExactly(server, header, HeaderSize, token))
             {
-                // Check if message is too long
-                if (size >= readLineBuffer.Length)
-                {
-                    Debug.LogWarning("Line too long");
-                    break;
-                }
+                return null;
+            }
 
-                // Read one byte
-                var bytesRead = await server.ReadAsync(readLineBuffer, size, 1, token);
+            // Validate magic number
+            if (header[0] != Magic[0] || header[1] != Magic[1] || header[2] != Magic[2] || header[3] != Magic[3])
+            {
+                Debug.LogWarning("Invalid magic number in message header");
+                return null;
+            }
+
+            // Get payload length
+            var length = BitConverter.ToInt32(header, 4);
+            if (length < 0 || length > MaxMessageSize)
+            {
+                Debug.LogWarning($"Invalid message length: {length}");
+                return null;
+            }
+
+            // Read payload
+            var payload = new byte[length];
+            if (!await ReadExactly(server, payload, length, token))
+            {
+                return null;
+            }
+
+            return utf8.GetString(payload);
+        }
+
+        /// <summary>
+        /// Read exactly the specified number of bytes from the stream.
+        /// </summary>
+        /// <param name="stream">stream to read from</param>
+        /// <param name="buffer">buffer to read into</param>
+        /// <param name="count">number of bytes to read</param>
+        /// <param name="token">cancellation token</param>
+        /// <returns>true if successful, false if connection closed</returns>
+        private async Task<bool> ReadExactly(Stream stream, byte[] buffer, int count, CancellationToken token)
+        {
+            var totalRead = 0;
+            while (totalRead < count)
+            {
+                var bytesRead = await stream.ReadAsync(buffer, totalRead, count - totalRead, token);
                 if (bytesRead == 0)
                 {
-                    // Client disconnected
+                    // Connection closed
                     isConnected = false;
-                    break;
+                    return false;
                 }
-
-                // Check if end of message
-                size += bytesRead;
-                var c = readLineBuffer[size - 1];
-                if (c == '\n')
-                {
-                    // End of message
-                    var message = utf8.GetString(readLineBuffer, 0, size - 1);
-                    Array.Clear(readLineBuffer, 0, size);
-                    return message;
-                }
+                totalRead += bytesRead;
             }
-            return null;
+            return true;
         }
     }
 }
