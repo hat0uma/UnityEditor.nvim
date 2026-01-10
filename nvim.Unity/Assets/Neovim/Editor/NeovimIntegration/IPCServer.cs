@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Threading;
-using System.IO;
 using System.IO.Pipes;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
@@ -20,7 +19,7 @@ namespace NeovimEditor
         public string version;
         public string method;
         public string[] parameters;
-        public override string ToString() => $"IPCRequestMessage(id={id}, version={version}, method={method}, parameters=[{string.Join(", ", parameters)}])";
+        public override readonly string ToString() => $"IPCRequestMessage(id={id}, version={version}, method={method}, parameters=[{string.Join(", ", parameters)}])";
     }
 
     /// <summary>
@@ -38,7 +37,7 @@ namespace NeovimEditor
         public string version;
         public int status;
         public string result;
-        public override string ToString() => $"IPCResponseMessage(request_id={id}, version={version}, status={status}, result={result})";
+        public override readonly string ToString() => $"IPCResponseMessage(request_id={id}, version={version}, status={status}, result={result})";
     }
 
     /// <summary>
@@ -68,7 +67,7 @@ namespace NeovimEditor
         /// <summary>
         /// Buffer for reading a line from named pipe server.
         /// </summary>
-        private byte[] readLineBuffer = new byte[1024];
+        private readonly byte[] readLineBuffer = new byte[1024];
 
         /// <summary>
         /// client is connected.
@@ -77,7 +76,7 @@ namespace NeovimEditor
         private bool isConnected = false;
 
 
-        private static Encoding utf8 = new UTF8Encoding(false);
+        private static readonly Encoding utf8 = new UTF8Encoding(false);
 
         /// <summary>
         /// Start IPC server.
@@ -210,7 +209,7 @@ namespace NeovimEditor
                 if (c == '\n')
                 {
                     // End of message
-                    var message = Encoding.UTF8.GetString(readLineBuffer, 0, size - 1);
+                    var message = utf8.GetString(readLineBuffer, 0, size - 1);
                     Array.Clear(readLineBuffer, 0, size);
                     return message;
                 }
