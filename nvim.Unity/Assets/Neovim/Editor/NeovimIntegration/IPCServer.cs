@@ -124,33 +124,31 @@ namespace NeovimEditor
 
                 // Handle send and receive
                 // Debug.Log("Client connected");
-                using (var writer = new StreamWriter(server, utf8, 1024, true))
-                using (var reader = new StreamReader(server, utf8, false, 1024, true))
-                {
-                    var receiveTask = HandleReceive(server, reader, token);
-                    var sendTask = HandleSend(server, writer, token);
-                    await Task.WhenAll(receiveTask, sendTask);
-                }
+                var receiveTask = HandleReceive(server, token);
+                var sendTask = HandleSend(server, token);
+                await Task.WhenAll(receiveTask, sendTask);
+
                 // Debug.Log("Client disconnected");
                 isConnected = false;
             }
         }
 
-        private async Task HandleSend(NamedPipeServerStream server, StreamWriter writer, CancellationToken token)
+        private async Task HandleSend(NamedPipeServerStream server, CancellationToken token)
         {
             while (!token.IsCancellationRequested && isConnected)
             {
                 if (SendQueue.TryDequeue(out var ipcMessage))
                 {
-                    var message = JsonUtility.ToJson(ipcMessage);
-                    await writer.WriteLineAsync(message.AsMemory(), token);
-                    await writer.FlushAsync();
+                    var message = JsonUtility.ToJson(ipcMessage) + "\n";
+                    var bytes = utf8.GetBytes(message);
+                    await server.WriteAsync(bytes, token);
+                    await server.FlushAsync(token);
                 }
                 await Task.Delay(10, token);
             }
         }
 
-        private async Task HandleReceive(NamedPipeServerStream server, StreamReader reader, CancellationToken token)
+        private async Task HandleReceive(NamedPipeServerStream server, CancellationToken token)
         {
             while (!token.IsCancellationRequested && isConnected)
             {
