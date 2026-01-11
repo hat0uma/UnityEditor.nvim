@@ -99,7 +99,7 @@ end
 ---@field line integer
 ---@field column integer
 ---@field message string
----@field severity string
+---@field severity "error" | "assert" | "exception" | "warning" | "log"
 
 ---@class UnityEditor.LogsResponse
 ---@field items UnityEditor.LogEntry[]
