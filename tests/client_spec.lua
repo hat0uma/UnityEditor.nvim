@@ -1,6 +1,6 @@
 ---@diagnostic disable: await-in-sync
-local Client = require("unity-editor.client").Client
-local package_info = require("unity-editor.package_info")
+local Client = require("unity-editor.client")
+local protocol = require("unity-editor.protocol")
 local is_windows = vim.uv.os_uname().sysname:match("Windows")
 
 local bit = require("bit")
@@ -126,7 +126,7 @@ describe("UnityEditor.Client with Dummy Server", function()
   end)
 
   it("should send request and handle response", function()
-    local response_data = { id = 0, result = "ok", status = 0, version = package_info.version } -- id will be set dynamically
+    local response_data = { id = 0, result = "ok", status = 0, version = protocol.VERSION } -- id will be set dynamically
 
     -- Start the dummy server
     server = start_dummy_server(pipename, function(pipe, payload)

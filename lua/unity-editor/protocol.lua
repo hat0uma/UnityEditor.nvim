@@ -1,3 +1,6 @@
+local M = {}
+M.VERSION = "0.0.1"
+
 --
 -- Message Format
 --
@@ -9,8 +12,6 @@
 -- - Length: little-endian uint32
 -- - Max Message length: 1MB
 --
-
-local M = {}
 
 local bit = require("bit")
 local band, bor, lshift, rshift = bit.band, bit.bor, bit.lshift, bit.rshift
@@ -63,7 +64,7 @@ M.Status = {
 function M.serialize_request(method, parameters, id)
   local json_data = vim.json.encode({
     id = id,
-    version = require("unity-editor.package_info").version,
+    version = M.VERSION,
     method = method,
     parameters = vim.json.encode(parameters or {}),
   })

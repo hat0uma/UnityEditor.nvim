@@ -1,9 +1,41 @@
+local Client = require("unity-editor.client")
 local log = require("unity-editor.log")
 
 ---@class UnityEditor.api
 local M = {}
 
-local cl = require("unity-editor.client")
+--- @type table<string,UnityEditor.Client>
+local clients = {}
+
+--- Get client
+---@param opts { project_dir?: string, bufnr?:integer }
+---@return UnityEditor.Client? client, string? reason
+function M.get_client(opts)
+  -- if project_dir is not specified, find project root from buffer
+  local project_dir = opts.project_dir
+  if not project_dir then
+    project_dir = M.find_project_root(opts.bufnr or vim.api.nvim_get_current_buf())
+  end
+
+  -- if project_dir is still not found, exit
+  if not project_dir then
+    return nil, "Current buffer is not in Unity project"
+  end
+
+  -- if project is not open in Unity Editor, exit
+  if not M.is_project_open_in_unity(project_dir) then
+    return nil, "This project is not open in Unity Editor"
+  end
+
+  local key = vim.fs.normalize(project_dir)
+  local client = clients[key]
+  if not client then
+    client = Client:new(project_dir)
+    clients[key] = client
+  end
+
+  return client
+end
 
 --- Request Unity Editor to do something.
 ---@param project_dir string? Unity project directory path
@@ -12,24 +44,14 @@ local cl = require("unity-editor.client")
 ---@param callback? fun(data?: UnityEditor.ResponseMessage, err?: string)
 ---@return boolean success Whether the request was initiated
 local function request(project_dir, method, parameters, callback)
-  -- if project_dir is not specified, find project root from current buffer
-  if not project_dir then
-    project_dir = M.find_project_root(vim.api.nvim_get_current_buf())
-  end
-
-  -- if project_dir is still not found, exit
-  if not project_dir then
-    vim.notify("Current buffer is not in Unity project", vim.log.levels.WARN)
+  local client, reason = M.get_client({ project_dir = project_dir })
+  if not client then
+    if reason then
+      vim.notify(reason, vim.log.levels.WARN)
+    end
     return false
   end
 
-  -- if project is not open in Unity Editor, exit
-  if not M.is_project_open_in_unity(project_dir) then
-    vim.notify("This project is not open in Unity Editor", vim.log.levels.WARN)
-    return false
-  end
-
-  local client = cl.get_project_client(project_dir)
   client:request(method, parameters, callback)
   return true
 end

@@ -290,35 +290,4 @@ function Client:_read_response(request_id, timeout_ms)
   return response, nil
 end
 
---------------------------------------
--- module exports
---------------------------------------
-
-local M = {}
-M.Client = Client
-
---- @type table<string,UnityEditor.Client>
-local clients = {}
-
---- get Unity Editor client instance
----@param project_dir string Unity project directory path
----@return UnityEditor.Client
-function M.get_project_client(project_dir)
-  -- normalize project_dir
-  project_dir = assert(vim.uv.fs_realpath(project_dir))
-
-  local client = clients[project_dir]
-  if not client then
-    client = Client:new(project_dir)
-    clients[project_dir] = client
-  end
-  return client
-end
-
---- get all clients
----@return table<string,UnityEditor.Client>
-function M.get_clients()
-  return clients
-end
-
-return M
+return Client
