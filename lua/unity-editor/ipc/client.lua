@@ -93,7 +93,7 @@ end
 
 --- Request to Unity Editor
 ---@param method string
----@param parameters string[]
+---@param parameters table|nil
 ---@param callback? fun(data?: UnityEditor.ResponseMessage, err?: string)
 function Client:request(method, parameters, callback)
   callback = callback or function(data, err)
@@ -154,7 +154,7 @@ end
 ---@async
 --- Execute request
 ---@param method string
----@param parameters string[]
+---@param parameters table|nil
 ---@return UnityEditor.ResponseMessage? response
 function Client:_execute_request(method, parameters)
   local opts = { write_max_retries = 10, read_max_retries = 10, retry_interval_ms = 500, readline_timeout_ms = 500 }

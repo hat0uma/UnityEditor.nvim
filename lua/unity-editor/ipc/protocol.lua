@@ -41,7 +41,7 @@ end
 ---@field id integer
 ---@field version string
 ---@field method string
----@field parameters string[]
+---@field parameters string JSON string for method-specific parameters
 
 ---@class UnityEditor.ResponseMessage
 ---@field id integer
@@ -57,7 +57,7 @@ M.Status = {
 
 --- Serialize a request message with binary header.
 ---@param method string The method to call.
----@param parameters string[] The parameters to pass to the method.
+---@param parameters table|nil The parameters to pass to the method (will be JSON-encoded).
 ---@param id integer The request id.
 ---@return string message The serialized request message with header.
 function M.serialize_request(method, parameters, id)
@@ -65,7 +65,7 @@ function M.serialize_request(method, parameters, id)
     id = id,
     version = require("unity-editor.package_info").version,
     method = method,
-    parameters = parameters,
+    parameters = vim.json.encode(parameters or {}),
   })
   local header = MAGIC .. pack_uint32_le(#json_data)
   return header .. json_data

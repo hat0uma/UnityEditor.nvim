@@ -10,17 +10,21 @@ using UnityEngine;
 namespace NeovimEditor
 {
     /// <summary>
-    /// IPC Message type for communication between Neovim and Unity Editor.
-    /// Since it uses JSONUtility for deserialization internally, it cannot send complex structured messages.
+    /// IPC Request message type for communication between Neovim and Unity Editor.
     /// </summary>
+    /// <remarks>
+    /// The <c>parameters</c> field is a JSON string (not a parsed object) to allow method-specific
+    /// parameter structures while staying within JsonUtility's serialization constraints.
+    /// Each method handler is responsible for deserializing parameters into its expected type.
+    /// </remarks>
     [Serializable]
     public struct IPCRequestMessage
     {
         public int id;
         public string version;
         public string method;
-        public string[] parameters;
-        public override readonly string ToString() => $"IPCRequestMessage(id={id}, version={version}, method={method}, parameters=[{string.Join(", ", parameters)}])";
+        public string parameters;
+        public override readonly string ToString() => $"IPCRequestMessage(id={id}, version={version}, method={method}, parameters={parameters})";
     }
 
     /// <summary>

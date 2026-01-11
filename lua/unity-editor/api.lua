@@ -6,7 +6,7 @@ local cl = require("unity-editor.ipc.client")
 --- Request Unity Editor to do something.
 ---@param project_dir string? Unity project directory path
 ---@param method string
----@param parameters string[]
+---@param parameters table|nil
 local function request(project_dir, method, parameters)
   -- if project_dir is not specified, find project root from current buffer
   if not project_dir then

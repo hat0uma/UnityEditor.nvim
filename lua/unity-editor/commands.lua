@@ -5,11 +5,13 @@ local commands = {
   refresh = api.refresh,
   generate_sln = api.generate_sln,
   playmode = {
+    [1] = "toggle",
     enter = api.playmode_enter,
     exit = api.playmode_exit,
     toggle = api.playmode_toggle,
   },
   autorefresh = {
+    [1] = "toggle",
     toggle = api.autorefresh.toggle,
     enable = api.autorefresh.enable,
     disable = api.autorefresh.disable,
@@ -38,7 +40,7 @@ local function action_candidates(subcommand_name, lead)
 
   ---@diagnostic disable-next-line: no-unknown
   return vim.tbl_filter(function(v)
-    return vim.startswith(v, lead)
+    return type(v) == "string" and vim.startswith(v, lead)
   end, vim.tbl_keys(subcommand))
 end
 
@@ -68,7 +70,7 @@ function M.setup()
     end
 
     -- If no action is specified, show the list of actions
-    local action = parts[2]
+    local action = parts[2] or sub_command[1]
     if not action then
       vim.notify("Please specify: " .. table.concat(vim.tbl_keys(sub_command), ", "))
       return
