@@ -51,7 +51,7 @@ local function start_dummy_server(pipename, on_receive)
     local buffer = "" --- @type string
     client:read_start(function(read_err, data)
       if not data then
-        print(read_err)
+        client:read_stop()
         client:close()
         return
       end
@@ -104,7 +104,7 @@ describe("UnityEditor.Client with Dummy Server", function()
   it("should connect to Dummy Server", function() ---@async
     server = start_dummy_server(pipename)
     local client = Client:new(project_dir)
-    local ok, err = client:connect_async()
+    local ok, err = client:_connect_async()
     assert.is_true(ok)
     assert.is_nil(err)
   end)
@@ -112,8 +112,8 @@ describe("UnityEditor.Client with Dummy Server", function()
   it("should close the connection", function() ---@async
     server = start_dummy_server(pipename)
     local client = Client:new(project_dir)
-    client:connect_async()
-    client:close()
+    client:_connect_async()
+    client:_close()
     assert.is_false(client:is_connected())
   end)
 
@@ -121,7 +121,7 @@ describe("UnityEditor.Client with Dummy Server", function()
     server = start_dummy_server(pipename)
     local client = Client:new(project_dir)
     assert.is_false(client:is_connected())
-    client:connect_async()
+    client:_connect_async()
     assert.is_true(client:is_connected())
   end)
 
@@ -138,7 +138,7 @@ describe("UnityEditor.Client with Dummy Server", function()
 
     -- Create a client and send a request
     local client = Client:new(project_dir)
-    client:request("test_method", {}, function(data, err)
+    client:request("test_method", nil, function(data, err)
       vim.schedule(function()
         assert.is_nil(err)
         assert.are.same(data.result, response_data.result)

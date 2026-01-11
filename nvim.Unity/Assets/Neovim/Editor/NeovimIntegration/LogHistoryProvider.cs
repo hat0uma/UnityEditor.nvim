@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
-using System.Text.RegularExpressions;
 using UnityEngine;
 
 namespace NeovimEditor
@@ -70,21 +69,15 @@ namespace NeovimEditor
                 {
                     if (_logEntry.GetEntryInternal(i))
                     {
-                        var file = _logEntry.File;
-
-                        // Only include entries with file paths (for Neovim jumping)
-                        if (!string.IsNullOrEmpty(file))
+                        var renderedLine = UnityEditor_LogEntry.GetRenderedLine(i);
+                        result.Add(new LogEntry
                         {
-                            var renderedLine = UnityEditor_LogEntry.GetRenderedLine(i);
-                            result.Add(new LogEntry
-                            {
-                                file = ToAbsolutePath(file),
-                                line = _logEntry.Line,
-                                column = _logEntry.Column,
-                                message = renderedLine,
-                                severity = ParseMode(_logEntry.Mode)
-                            });
-                        }
+                            file = ToAbsolutePath(_logEntry.File),
+                            line = _logEntry.Line,
+                            column = _logEntry.Column,
+                            message = renderedLine,
+                            severity = ParseMode(_logEntry.Mode)
+                        });
                     }
                 }
             }
@@ -119,7 +112,6 @@ namespace NeovimEditor
         private static string ParseMode(int mode)
         {
             // Unity log mode flags: kError = 1, kAssert = 2, kWarning = 4, kLog = 8, kException = 16
-            // if ((mode & ((1 << 0)) != 0| (1 << 4) | (1 << 1))) != 0)
             if ((mode & (1 << 0)) != 0)
             {
                 return "error";
@@ -264,6 +256,11 @@ namespace NeovimEditor
                 return "";
             }
 
+            // Arguments:
+            // 1 - int index
+            // 2 - int numberOfLines
+            // 3 - ref int mask
+            // 4 - [in, out] ref string outString
             var parameters = new object[] { index, 1, 0, "" };
             _getLinesAndModeFromEntryInternal.Invoke(null, parameters);
             return (string)parameters[3];

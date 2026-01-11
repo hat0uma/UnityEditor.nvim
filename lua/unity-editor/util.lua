@@ -1,4 +1,5 @@
 local M = {}
+local log = require("unity-editor.log")
 
 ---@async
 --- Wait for ms milliseconds
@@ -27,7 +28,7 @@ function M.run_with_retry(label, max_retries, interval, fn)
       return true
     end
 
-    print(string.format("(%d/%d) %s Retrying... %s", i, max_retries, label, err or ""))
+    log.debug("(%d/%d) %s Retrying... %s", i, max_retries, label, err or "")
     M.wait_for_milliseconds(interval)
   end
 

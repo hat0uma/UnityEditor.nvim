@@ -1,3 +1,5 @@
+local log = require("unity-editor.log")
+
 ---@class UnityEditor.api
 local M = {}
 
@@ -145,18 +147,18 @@ function M.logs(project_dir, handler)
     nil,
     vim.schedule_wrap(function(response, err)
       if err then
-        vim.notify(err, vim.log.levels.ERROR)
+        log.error(err)
         return
       end
       if not response then
-        vim.notify("No response from Unity Editor", vim.log.levels.ERROR)
+        log.error("No response from Unity Editor")
         return
       end
 
       ---@type boolean, UnityEditor.LogsResponse
       local ok, logs = pcall(vim.json.decode, response.result)
       if not ok then
-        vim.notify("Failed to parse logs: " .. response.result, vim.log.levels.ERROR)
+        log.error("Failed to parse logs: " .. response.result, vim.log.levels.ERROR)
         return
       end
 
