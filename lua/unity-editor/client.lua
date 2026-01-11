@@ -1,6 +1,6 @@
 local StreamReader = require("unity-editor.stream_reader")
-local protocol = require("unity-editor.ipc.protocol")
-local util = require("unity-editor.ipc.util")
+local protocol = require("unity-editor.protocol")
+local util = require("unity-editor.util")
 local is_windows = vim.uv.os_uname().sysname:match("Windows")
 
 local PIPENAME_BASE = is_windows and "\\\\.\\pipe\\UnityEditorIPC" or "/tmp/UnityEditorIPC"

@@ -1,5 +1,5 @@
 ---@diagnostic disable: await-in-sync
-local Client = require("unity-editor.ipc.client").Client
+local Client = require("unity-editor.client").Client
 local package_info = require("unity-editor.package_info")
 local is_windows = vim.uv.os_uname().sysname:match("Windows")
 

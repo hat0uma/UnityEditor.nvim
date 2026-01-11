@@ -1,7 +1,7 @@
 ---@class UnityEditor.api
 local M = {}
 
-local cl = require("unity-editor.ipc.client")
+local cl = require("unity-editor.client")
 
 --- Request Unity Editor to do something.
 ---@param project_dir string? Unity project directory path
