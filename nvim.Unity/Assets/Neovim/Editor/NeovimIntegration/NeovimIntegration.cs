@@ -34,7 +34,8 @@ namespace NeovimEditor
             var package = LoadPackageJson();
             var refreshProvider = new RefreshProvider();
             var playmodeProvider = new PlaymodeProvider();
-            var instance = new NeovimIntegration(refreshProvider, playmodeProvider, package);
+            var logsProvider = new LogHistoryProvider();
+            var instance = new NeovimIntegration(refreshProvider, playmodeProvider, logsProvider, package);
 
             // Register update callback
             EditorApplication.update += instance.Update;
@@ -77,16 +78,18 @@ namespace NeovimEditor
         /// <summary>
         /// Package information from package.json.
         /// </summary>
-        private Package package;
-        private RefreshProvider refreshProvider;
-        private PlaymodeProvider playmodeProvider;
+        private readonly Package package;
+        private readonly RefreshProvider refreshProvider;
+        private readonly PlaymodeProvider playmodeProvider;
+        private readonly LogHistoryProvider logHistoryProvider;
 
         private const string LastRequestIdKey = "NeovimEditor.LastRequestId";
 
-        public NeovimIntegration(RefreshProvider refreshProvider, PlaymodeProvider playmodeProvider, Package package)
+        public NeovimIntegration(RefreshProvider refreshProvider, PlaymodeProvider playmodeProvider, LogHistoryProvider logHistoryProvider, Package package)
         {
             this.refreshProvider = refreshProvider;
             this.playmodeProvider = playmodeProvider;
+            this.logHistoryProvider = logHistoryProvider;
             this.package = package;
         }
 
@@ -235,6 +238,12 @@ namespace NeovimEditor
 
                 case "generate_sln":
                     refreshProvider.GenerateSolution();
+                    break;
+
+                case "get_logs":
+                    var logs = logHistoryProvider.GetLogHistories().ToArray();
+                    var response = JsonUtility.ToJson(new LogsResponse { items = logs });
+                    SendResponse(response);
                     break;
 
                 default:

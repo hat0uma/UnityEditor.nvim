@@ -7,7 +7,9 @@ local cl = require("unity-editor.ipc.client")
 ---@param project_dir string? Unity project directory path
 ---@param method string
 ---@param parameters table|nil
-local function request(project_dir, method, parameters)
+---@param callback? fun(data?: UnityEditor.ResponseMessage, err?: string)
+---@return boolean success Whether the request was initiated
+local function request(project_dir, method, parameters, callback)
   -- if project_dir is not specified, find project root from current buffer
   if not project_dir then
     project_dir = M.find_project_root(vim.api.nvim_get_current_buf())
@@ -16,17 +18,18 @@ local function request(project_dir, method, parameters)
   -- if project_dir is still not found, exit
   if not project_dir then
     vim.notify("Current buffer is not in Unity project", vim.log.levels.WARN)
-    return
+    return false
   end
 
   -- if project is not open in Unity Editor, exit
   if not M.is_project_open_in_unity(project_dir) then
     vim.notify("This project is not open in Unity Editor", vim.log.levels.WARN)
-    return
+    return false
   end
 
   local client = cl.get_project_client(project_dir)
-  client:request(method, parameters)
+  client:request(method, parameters, callback)
+  return true
 end
 
 --- refresh Unity Editor asset database
@@ -89,6 +92,77 @@ function M.find_project_root(bufnr)
 
   local project_root = vim.fs.dirname(found[1])
   return project_root
+end
+
+---@class UnityEditor.LogEntry
+---@field file string
+---@field line integer
+---@field column integer
+---@field message string
+---@field severity string
+
+---@class UnityEditor.LogsResponse
+---@field items UnityEditor.LogEntry[]
+
+--- Send logs to quickfix
+---@param response UnityEditor.LogsResponse
+local function send_to_qflist(response)
+  local severity_map = {
+    ["error"] = "E",
+    ["assert"] = "E",
+    ["exception"] = "E",
+    ["warning"] = "W",
+    ["log"] = "I",
+  }
+
+  local qf_items = {} ---@type vim.quickfix.entry[]
+  for _, item in ipairs(response.items or {}) do
+    qf_items[#qf_items + 1] = {
+      filename = item.file,
+      lnum = item.line,
+      col = item.column,
+      text = item.message,
+      type = severity_map[item.severity],
+    }
+  end
+
+  vim.fn.setqflist({}, " ", { title = "Unity Log", items = qf_items })
+  if #qf_items > 0 then
+    vim.cmd("copen")
+  else
+    vim.notify("No logs found", vim.log.levels.INFO)
+  end
+end
+
+--- Get logs from Unity Editor and set to quickfix list.
+---@param project_dir? string Unity project directory path
+---@param handler? fun( response:UnityEditor.LogsResponse )
+function M.logs(project_dir, handler)
+  handler = handler or send_to_qflist
+  request(
+    project_dir,
+    "get_logs",
+    nil,
+    vim.schedule_wrap(function(response, err)
+      if err then
+        vim.notify(err, vim.log.levels.ERROR)
+        return
+      end
+      if not response then
+        vim.notify("No response from Unity Editor", vim.log.levels.ERROR)
+        return
+      end
+
+      ---@type boolean, UnityEditor.LogsResponse
+      local ok, logs = pcall(vim.json.decode, response.result)
+      if not ok then
+        vim.notify("Failed to parse logs: " .. response.result, vim.log.levels.ERROR)
+        return
+      end
+
+      handler(logs)
+    end)
+  )
 end
 
 M.autorefresh = require("unity-editor.autorefresh")

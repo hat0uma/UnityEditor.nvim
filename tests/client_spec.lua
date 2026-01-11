@@ -1,7 +1,6 @@
 ---@diagnostic disable: await-in-sync
 local Client = require("unity-editor.ipc.client").Client
 local package_info = require("unity-editor.package_info")
-local protocol = require("unity-editor.ipc.protocol")
 local is_windows = vim.uv.os_uname().sysname:match("Windows")
 
 local bit = require("bit")
@@ -46,43 +45,45 @@ local function start_dummy_server(pipename, on_receive)
   assert(server:bind(pipename))
   server:listen(128, function(listen_err)
     assert(not listen_err, listen_err)
-    local client = vim.uv.new_pipe(false)
+    local client = assert(vim.uv.new_pipe(false))
     server:accept(client)
 
-    local buffer = ""
+    local buffer = "" --- @type string
     client:read_start(function(read_err, data)
-      assert(data, read_err)
-      if data then
-        buffer = buffer .. data
-        -- Try to parse complete messages from buffer
-        while #buffer >= HEADER_SIZE do
-          local magic = buffer:sub(1, 4)
-          if magic ~= MAGIC then
-            error("Invalid magic number in test server")
-          end
-          local length = unpack_uint32_le(buffer, 5)
-          if #buffer < HEADER_SIZE + length then
-            -- Wait for more data
-            break
-          end
-          -- Extract payload
-          local payload = buffer:sub(HEADER_SIZE + 1, HEADER_SIZE + length)
-          buffer = buffer:sub(HEADER_SIZE + length + 1)
-          if on_receive then
-            on_receive(client, payload)
-          end
-        end
-      else
+      if not data then
+        print(read_err)
         client:close()
+        return
+      end
+
+      buffer = buffer .. data
+      -- Try to parse complete messages from buffer
+      while #buffer >= HEADER_SIZE do
+        local magic = buffer:sub(1, 4)
+        if magic ~= MAGIC then
+          error("Invalid magic number in test server")
+        end
+        local length = unpack_uint32_le(buffer, 5)
+        if #buffer < HEADER_SIZE + length then
+          -- Wait for more data
+          break
+        end
+        -- Extract payload
+        local payload = buffer:sub(HEADER_SIZE + 1, HEADER_SIZE + length)
+        buffer = buffer:sub(HEADER_SIZE + length + 1)
+        if on_receive then
+          on_receive(client, payload)
+        end
       end
     end)
   end)
   return server
 end
 
+local project_dir = "./tests/fixtures"
+local pipename = is_windows and "\\\\.\\pipe\\UnityEditorIPC-1234" or "/tmp/UnityEditorIPC-1234"
+
 describe("UnityEditor.Client with Dummy Server", function()
-  local project_dir = "./tests/fixtures"
-  local pipename = is_windows and "\\\\.\\pipe\\UnityEditorIPC-1234" or "/tmp/UnityEditorIPC-1234"
   local thread = coroutine.running()
 
   -- Start the dummy server before running tests
