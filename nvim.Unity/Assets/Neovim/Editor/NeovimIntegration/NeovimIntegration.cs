@@ -254,7 +254,7 @@ namespace NeovimEditor
                 status = (int)status,
                 result = result
             };
-            server.SendQueue.Enqueue(message);
+            server.SendQueue.Add(message);
         }
     }
 }

@@ -78,7 +78,7 @@ namespace NeovimEditor
         /// Message queue for sending messages to IPC client.
         /// This queue is used to pass messages from main thread to worker thread.
         /// </summary>
-        public ConcurrentQueue<IPCResponseMessage> SendQueue { get; } = new ConcurrentQueue<IPCResponseMessage>();
+        public BlockingCollection<IPCResponseMessage> SendQueue { get; } = new BlockingCollection<IPCResponseMessage>();
 
         private static readonly Encoding utf8 = new UTF8Encoding(false);
 
@@ -155,7 +155,7 @@ namespace NeovimEditor
             var header = new byte[HeaderSize];
             while (!token.IsCancellationRequested)
             {
-                if (SendQueue.TryDequeue(out var ipcMessage))
+                if (SendQueue.TryTake(out var ipcMessage, -1, token))
                 {
                     var json = JsonUtility.ToJson(ipcMessage);
                     var payload = utf8.GetBytes(json);
@@ -170,7 +170,6 @@ namespace NeovimEditor
                     await server.WriteAsync(payload, 0, payload.Length, token);
                     await server.FlushAsync(token);
                 }
-                await Task.Delay(10, token);
             }
         }
 
