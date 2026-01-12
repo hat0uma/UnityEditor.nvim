@@ -123,7 +123,8 @@ end
 ---@field line integer
 ---@field column integer
 ---@field message string
----@field severity "error" | "assert" | "exception" | "warning" | "log"
+---@field details string
+---@field severity "error" | "warning" | "info"
 
 ---@class UnityEditor.LogsResponse
 ---@field items UnityEditor.LogEntry[]
@@ -133,10 +134,8 @@ end
 local function send_to_qflist(response)
   local severity_map = {
     ["error"] = "E",
-    ["assert"] = "E",
-    ["exception"] = "E",
     ["warning"] = "W",
-    ["log"] = "I",
+    ["info"] = "I",
   }
 
   local qf_items = {} ---@type vim.quickfix.entry[]
@@ -158,7 +157,8 @@ local function send_to_qflist(response)
   end
 end
 
---- Get logs from Unity Editor and set to quickfix list.
+--- Get logs from Unity Editor.
+--- Uses snacks.picker if available, falls back to quickfix.
 ---@param project_dir? string Unity project directory path
 ---@param handler? fun( response:UnityEditor.LogsResponse )
 function M.logs(project_dir, handler)

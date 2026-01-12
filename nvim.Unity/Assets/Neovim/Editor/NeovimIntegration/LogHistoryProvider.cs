@@ -16,6 +16,7 @@ namespace NeovimEditor
         public int line;
         public int column;
         public string message;
+        public string details;
         public string severity;
     }
 
@@ -56,11 +57,6 @@ namespace NeovimEditor
                 return result;
             }
 
-            // Save current console flags
-            var originalFlags = UnityEditor_LogEntry.ConsoleFlags;
-
-            // Enable timestamp display
-            UnityEditor_LogEntry.SetConsoleFlag(UnityEditor_LogEntry.SHOWTIMESTAMP_FLAG, true);
             UnityEditor_LogEntry.StartGettingEntries();
             try
             {
@@ -76,6 +72,7 @@ namespace NeovimEditor
                             line = _logEntry.Line,
                             column = _logEntry.Column,
                             message = renderedLine,
+                            details = _logEntry.Message,
                             severity = ParseMode(_logEntry.Mode)
                         });
                     }
@@ -88,9 +85,6 @@ namespace NeovimEditor
             finally
             {
                 UnityEditor_LogEntry.EndGettingEntries();
-
-                // Restore original console flags
-                UnityEditor_LogEntry.ConsoleFlags = originalFlags;
             }
 
             return result;
@@ -111,24 +105,17 @@ namespace NeovimEditor
 
         private static string ParseMode(int mode)
         {
-            // Unity log mode flags: kError = 1, kAssert = 2, kWarning = 4, kLog = 8, kException = 16
-            if ((mode & (1 << 0)) != 0)
+            if (UnityEditor_LogEntry.IsError(mode))
             {
                 return "error";
             }
-            if ((mode & (1 << 1)) != 0)
-            {
-                return "assert";
-            }
-            if ((mode & (1 << 2)) != 0)
+
+            if (UnityEditor_LogEntry.IsWarning(mode))
             {
                 return "warning";
             }
-            if ((mode & (1 << 4)) != 0)
-            {
-                return "exception";
-            }
-            return "log";
+
+            return "info";
         }
     }
 
@@ -141,6 +128,7 @@ namespace NeovimEditor
         // Reflection Types
         private static readonly Type LogEntryType = Type.GetType("UnityEditor.LogEntry, UnityEditor.dll");
         private static readonly Type LogEntriesType = Type.GetType("UnityEditor.LogEntries, UnityEditor.dll");
+        private static readonly Type LogMessageFlagsExtensionsType = Type.GetType("UnityEditor.LogMessageFlagsExtensions, UnityEditor.dll");
 
         // Console flag for timestamp display
         public const int SHOWTIMESTAMP_FLAG = 1 << 10;
@@ -153,6 +141,11 @@ namespace NeovimEditor
         private static readonly MethodInfo _getLinesAndModeFromEntryInternal;
         private static readonly PropertyInfo _consoleFlagsProp;
         private static readonly MethodInfo _setConsoleFlag;
+
+        // Reflection Methods for LogMessageFlagsExtensions static class
+        private static readonly MethodInfo _isInfo;
+        private static readonly MethodInfo _isWarning;
+        private static readonly MethodInfo _isError;
 
         // Reflection Fields for LogEntry instance
         private static readonly FieldInfo _fileField;
@@ -189,6 +182,11 @@ namespace NeovimEditor
             _columnField = LogEntryType.GetField("column", flags);
             _messageField = LogEntryType.GetField("message", flags);
             _modeField = LogEntryType.GetField("mode", flags);
+
+            // LogMessageFlagsExtensions static methods
+            _isInfo = LogMessageFlagsExtensionsType.GetMethod("IsInfo", BindingFlags.Static | BindingFlags.Public);
+            _isError = LogMessageFlagsExtensionsType.GetMethod("IsError", BindingFlags.Static | BindingFlags.Public);
+            _isWarning = LogMessageFlagsExtensionsType.GetMethod("IsWarning", BindingFlags.Static | BindingFlags.Public);
         }
 
         public UnityEditor_LogEntry()
@@ -264,6 +262,19 @@ namespace NeovimEditor
             var parameters = new object[] { index, 1, 0, "" };
             _getLinesAndModeFromEntryInternal.Invoke(null, parameters);
             return (string)parameters[3];
+        }
+
+        public static bool IsWarning(int mode)
+        {
+            return (bool)_isWarning?.Invoke(null, new object[] { mode });
+        }
+        public static bool IsInfo(int mode)
+        {
+            return (bool)_isInfo?.Invoke(null, new object[] { mode });
+        }
+        public static bool IsError(int mode)
+        {
+            return (bool)_isError?.Invoke(null, new object[] { mode });
         }
     }
 }

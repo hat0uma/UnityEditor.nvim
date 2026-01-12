@@ -14,6 +14,10 @@ function M.setup(opts)
   if opts.autorefresh then
     require("unity-editor.autorefresh").enable()
   end
+
+  if Snacks and pcall(require, "snacks.picker") then
+    Snacks.picker.sources.unity_logs = require("unity-editor.integrations.snacks").source
+  end
 end
 
 return setmetatable(M, {
